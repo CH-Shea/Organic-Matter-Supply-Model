@@ -1,0 +1,1554 @@
+---
+title: "Organic Matter Source Separation and Sample Selection - Ocean Station Papa"
+author: "Connor Shea"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  #html_document: 
+  bookdown::html_document2:  
+    self-contained: yes
+    theme: cerulean #paper #cosmo #journal #readable
+    toc: true
+    smooth_scroll: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    fig_caption: yes
+    code_folding: hide
+bibliography: Utilities/MesoPelaZooAA.bib
+csl: Utilities/LnO.csl
+link-citations: yes
+---
+
+```{r setup, echo=FALSE, warning=FALSE}
+## This chunk sets up a working directory, loads packages, defines a couple functions, and sets global chunk options for the .Rmd document
+
+# clean up
+rm(list=ls()) 
+
+# fresh start? If FALSE (select 2 in hard bracket), will only rerun a chunk if 
+# changes are detected within the text of that chunk.
+rmCache <- c(TRUE, FALSE)[2] 
+tfn <- knitr::current_input()              # name of this file
+tfn <- substr(tfn, 1, nchar(tfn)-4)        # Remove the ".Rmd"
+tfn_cache <- paste0("Caches/", tfn, "_cache")         # Append "_cache" to it
+tfn_figures <- paste0("Figures/", tfn, "_figures")         # Append "_figures" to it
+if (rmCache) {
+  if (file.exists(tfn_cache))                # If the cache exists...
+    unlink(tfn_cache, recursive=TRUE)        # ...delete it.
+}
+
+# load packages quietly
+shhh <- suppressPackageStartupMessages # It's a library, so shhh!
+want <- c("knitr", 
+          "readxl", # for reading xl files
+          "MASS", # some statistics including lda
+          "vegan", # ecology statistics
+          "FactoMineR", # includes PCA function and utilities
+          "factoextra", # extra utilities for FactoMineR
+          "runjags", # To run Bayesian models
+          "TruncatedDistributions", # To generate truncate porbability distributions
+          "coda",  
+          "DT", # makes nice sortable tables
+          "openxlsx", # writes to .xlsx files
+          "compositions", 
+          "kableExtra",
+          "zeallot", 
+          "magrittr", 
+          "DirichletReg", 
+          "Ternary", 
+          "png",
+          "ggplot2",
+          "ggpubr",
+          "ggstance", # for vertical position dodging
+          "ggtern", # for ternary plots in ggplot2
+          "ggforce", # for specific extra plotting capabilities (facet_row())
+          "plotly",
+          "gridExtra",
+          "graphics",
+          "reshape2",
+          "psych"
+          )
+for (pkg in want) shhh(library(pkg, character.only=TRUE))
+
+# set some chunk options
+gr <- (1+sqrt(5))/2 # golden ratio, for figures
+opts_chunk$set(comment="  ",
+               fig.asp=0.9/gr,       # <--- gr used here
+               fig.align="center",
+               #echo=FALSE,
+               cache=c(TRUE, FALSE)[1], 
+               cache.path = paste0(tfn_cache,"/"),
+               fig.path = paste0(tfn_figures,"/"),
+               eval.after="fig.cap", # for dynamic captions
+               collapse=TRUE, 
+               dev="png", # svg, pdf, jpg, tiff
+               fig.width=7.0,
+               out.width="95%"
+               )
+
+## defining additional functions we might need
+
+# Kruschke's utility functions (edited by NF)
+if (c(TRUE,FALSE)[1]) source("Utilities/DBDA2E-utilities.R") 
+
+## a couple of lines we need to run every time we knit
+# setting the ggplot theme
+theme_set(theme_classic2()+
+            theme(panel.grid.major.x = element_line(colour = "grey95"),
+                  panel.grid.major.y = element_line(colour = "grey95")))
+# defining a ggplot object to remove the x axis
+no.x.axis <- theme(axis.title.x=element_blank(),
+                   axis.text.x=element_blank(),
+                   axis.ticks.x=element_blank())
+# defining a ggplot object to remove the y axis
+no.y.axis <- theme(axis.title.y=element_blank(),
+                   axis.text.y=element_blank(),
+                   axis.ticks.y=element_blank())
+
+# Loading up some functions we might need
+source("Functions/calcSDs.R") # contains functions SDmean() and SDsum()
+source("Functions/Post-Mode.R") # contains function post.mode()
+source("Functions/SplitViolin.R") # contains function geom_split_violin()
+# Also loading up some functions we've written for key modelling and simulation tasks
+# source("Functions/OMSM_Gen_Model.R")
+source("Functions/OMSM3_Gen_Model.R")
+source("Functions/Sim_Zoop.R")
+source("Functions/OMSM_Global_Extract.R")
+source("Functions/OMSM_Zoop_Extract.R")
+```  
+
+<!-- The following commands provide a shorthand for common symbols when used in math mode. -->
+\input{}
+
+\newcommand{\um}{\ \mu \mathrm{ m}}
+\newcommand{\mm}{\mathrm{\ mm}}
+\newcommand{\m}{\mathrm{\ m}}
+\newcommand{\N}{\mathrm{^{15}\text{N}}}
+\newcommand{\dN}{\mathrm{\delta^{15}\text{N}}}
+\newcommand{\dNAA}{\mathrm{\delta^{15}\text{N}_\text{AA}}}
+\newcommand{\dNSAA}{\mathrm{\delta^{15}\text{N}_\text{SAA}}}
+\newcommand{\dNTAA}{\mathrm{\delta^{15}\text{N}_\text{TAA}}}
+\newcommand{\dNtr}{\mathrm{\delta^{15}\text{N}_\text{tr}}}
+\newcommand{\dNsrc}{\mathrm{\delta^{15}\text{N}_\text{src}}}
+\newcommand{\dNphe}{\mathrm{\delta^{15}N_{phe}}}
+\newcommand{\dNthr}{\mathrm{\delta^{15}N_{thr}}}
+\newcommand{\dNala}{\mathrm{\delta^{15}N_{ala}}}
+\newcommand{\dNglx}{\mathrm{\delta^{15}N_{glx}}}
+\newcommand{\dNThrPhe}{\mathrm{\delta^{15}N_{thr-phe}}}
+\newcommand{\dNAlaPhe}{\mathrm{\delta^{15}N_{ala-phe}}}
+\newcommand{\dNglxphe}{\mathrm{\delta^{15}N_{glx-phe}}}
+\newcommand{\DN}{\mathrm{\Delta^{15}\text{N}}}
+\newcommand{\DNAA}{\mathrm{\Delta^{15}\text{N}_\text{AA}}}
+\newcommand{\C}{\mathrm{^{13}\text{C}}}
+\newcommand{\dC}{\mathrm{\delta^{13}\text{C}}}
+\newcommand{\dCAA}{\mathrm{\delta^{13}\text{C}_\text{AA}}}
+\newcommand{\dCEAA}{\mathrm{\delta^{13}\text{C}_\text{EAA}}}
+\newcommand{\dCNAA}{\mathrm{\delta^{13}\text{C}_\text{NAA}}}
+\newcommand{\permil}{‰}
+\newcommand{\degree}{°}
+\newcommand{\TP}{\mathrm{TP}}
+\newcommand{\TPala}{\mathrm{TP_{ala-phe}}}
+\newcommand{\TPglx}{\mathrm{TP_{glx-phe}}}
+\newcommand{\TPts}{\mathrm{TP_{tr-src}}}
+\newcommand{\dTP}{\mathrm{\Delta TP_{ala-glx}}}
+
+The goal of this document is to assess the separation of different possible sources of organic matter in isotope space, as well as to filter out the samples that are not representative of likely sources. We will begin by just looking at data from Ocean Station Papa (OSP). The organic matter sources we will be differentiating are:
+
+  1. Surface particles
+  2. Large particles (>51 μm)
+  3. Small particles (1-51 μm)
+  4. Submicron particles (0.3-1.0 μm)
+  
+And we will visualize each amino acid $\dN$ value does as well as a few essential amino acid $\dC$ values.
+
+```{r identifying_tracers}
+
+## SPECIFYING TRACERS TO BE USED IN MODEL ##
+
+## Should amino acid δ15N data be included? (T/F)
+include_d15N <- TRUE
+
+## Should amino acid δ13C data be included? (T/F)
+include_d13C <- TRUE
+## Should essential amino acid δ13C data be mean normalized?
+meannorm_d13C <- TRUE
+
+# If using δ15N values in model
+if(include_d15N == TRUE) {
+  ## Which amino acid δ15N values should be included in the model? (should be 
+  ## consistent with column names in data file)
+  tracers_d15N <- c("d15NGlx","d15NAla","d15NAsx","d15NIle","d15NLeu","d15NPro","d15NVal","d15NSer","d15NGly","d15NLys","d15NPhe","d15NThr")
+  ## What columns in the data file contain the uncertainties in those δ15N values?
+  SDtracers_d15N <- c("SDd15NGlx","SDd15NAla","SDd15NAsx","SDd15NIle","SDd15NLeu","SDd15NPro","SDd15NVal","SDd15NSer","SDd15NGly","SDd15NLys","SDd15NPhe","SDd15NThr")
+} else {
+  tracers_d15N <- c()
+  SDtracers_d15N <- c()
+}
+
+# If using δ13C values in model
+if(include_d13C == TRUE) {
+  ## Which essential amino acid δ13C values should be included in the model? 
+  ## (should be consistent with column names in data file)
+  tracers_d13C <- c("d13CThr","d13CVal","d13CLeu","d13CIle","d13CPhe")
+  ## What columns in the data file contain the uncertainties in those δ13C values?
+  SDtracers_d13C <- c("SDd13CThr","SDd13CVal","SDd13CLeu","SDd13CIle","SDd13CPhe")
+} else {
+  tracers_d13C <- c()
+  SDtracers_d13C <- c()
+}
+
+## Now we'll make one vector containing all of the tracers to be used in the model
+tracers_all <- c(tracers_d15N,tracers_d13C)
+SDtracers_all <- c(SDtracers_d15N,SDtracers_d13C)
+
+## We'll also specify other subsets of tracers to be assessed
+tracers_SAA <- c("d15NSer","d15NGly","d15NLys","d15NPhe")
+SDtracers_SAA <- c("SDd15NSer","SDd15NGly","SDd15NLys","SDd15NPhe")
+
+tracers_select <- c("d15NAla","d15NPhe","d15NThr")
+SDtracers_select <- c("SDd15NAla","SDd15NPhe","SDd15NThr")
+
+tracers_complete <- c(tracers_select,"d13CThr","d13CLeu","d13CPhe")
+SDtracers_complete <- c(SDtracers_select,"SDd13CThr","SDd13CLeu","d13CPhe")
+
+## Code in chunks below will generally refer to the vector "tracers."
+## this is done to make code easily portable, but we must update the "tracers"
+## vector to reflect the current tracers of interest in a given portion of code
+tracers <- tracers_all
+SDtracers <- SDtracers_all
+
+# Last we'll define some generic groups of AAs that may be useful later on.
+# Update to reflect the column names in your data
+# all amino acids
+allAA = c("Ala", "Gly", "Thr", "Ser", "Val", "Leu", "Ile", "Pro", "Asx", "Met", "Glx", "Phe", "Tyr", "Lys", "SAA", "EAA")
+# columns with SD
+SDallAA <- c("SDAla", "SDGly", "SDThr", "SDSer", "SDVal", "SDLeu", "SDIle", "SDPro", "SDAsx", "SDMet", "SDGlx", "SDPhe", "SDTyr", "SDLys", "SDSAA", "SDEAA")
+# source amino acids
+srcAA = c("Phe","Gly","Ser","Lys")
+# columns with SD
+SDsrcAA = c("SDPhe","SDGly","SDSer","SDLys")
+# trophic amino acids
+trAA = c("Glx", "Asx", "Ala", "Ile", "Leu", "Pro", "Val","Thr")
+# columns with SD
+SDtrAA = c("SDGlx", "SDAsx", "SDAla", "SDIle", "SDLeu", "SDPro", "SDVal","SDThr")
+# All amino acids - sorted by SAA TAA and Thr
+allAA.ord <- c("Glx", "SDGlx",	"Ala", "SDAla",	"Asx", "SDAsx",	"Ile", "SDIle",	"Leu", "SDLeu",	"Pro", "SDPro",	"Val", "SDVal",	"Ser", "SDSer",	"Gly", "SDGly",	"Tyr", "SDTyr",	"Lys", "SDLys",	"Met", "SDMet",	"Phe", "SDPhe", "Thr", "SDThr","EAA","SDEAA")
+
+
+```
+
+```{r Import_Source_Data, eval=TRUE, fig.asp=0.6, out.width="100%"}
+
+## δ13C and δ15N data of organic matter sources should be stored in one, single 
+## .xlsx file. 
+
+## Columns containing amino acid δ-values and the associated standard 
+## deviations should match those defined in the chunk above.
+
+# Indicate the name of the column describing the organic matter source to which
+# each sample belongs
+Source_Variable <- "Group"
+# Indicate the names representing each possible source of organic matter in the
+# order in which you would like the referenced
+Sources <- c("Surface","Large","Small","Submicron")
+
+# List the name of any additional variables that should be stored for analysis
+Additional_variables <- c("Location","Epoch","Event","Size","Sizecat","Depth","Type")
+
+variables <- c(Source_Variable, Additional_variables)
+
+## IMPORTING DATA ##
+# Define the location of .xlsx file, and sheet name if multiple sheets are 
+# present. If additional data beyond organic matter sources is present in this 
+# file that is ok. We will subset the data below.
+Data.all <- read_excel("Data/AA-CSIA_OSP.xlsx",
+                       sheet = "combined")[c(variables,tracers,SDtracers)]
+# Defining the preferred order in which to reference organic matter sources
+Data.all[[Source_Variable]] <- factor(Data.all[[Source_Variable]], levels = c(Sources,"Mixed","Taxa"))
+
+Data.sources <- subset(Data.all, Type == "Particle" | Type == "Trap")
+Data.sources$Group <- factor(NA, levels = Sources)
+```
+
+# Sample Selection
+
+The first thing we need to do is figure out what is the appropriate minimum depth cutoff for "deep" particles. We want $\dN$ values to be essentially invariant with depth delow this cutoff, so let's have a look at depth trends in particle $\dN$ values.
+
+```{r Source-filtering-depth, dpi=300, fig.width=8, fig.asp=0.6, warning=FALSE}
+Data.sources.long <- 
+  melt(
+    Data.sources,
+    id.vars = variables,
+    variable.name = "Tracer",
+    value.name = "Value"
+  )
+Data.sources.long <- Data.sources.long[which(Data.sources.long$Tracer %in% tracers),]
+
+ggplot(data = Data.sources.long)+
+  geom_point(
+    aes(x=Value, y=Depth, color=Sizecat)
+  )+
+  facet_wrap(~Tracer, nrow=2, scales = "free_x")+
+  scale_y_reverse()
+
+```
+
+These plots show us that the data becomes mostly invariant with depth at and below about 200 m.
+
+```{r filter-V1}
+
+## FILTERING DATA ##
+Data.sources <- subset(Data.all, Type == "Particle" | Type == "Trap")
+Data.sources$Group <- factor(NA, levels = Sources)
+Data.sources$Group[
+  which(Data.sources$Depth < 100)
+  ] <- "Surface"
+Data.sources$Group[
+  which(Data.sources$Depth > 190 & 
+        (Data.sources$Sizecat == "Large" | Data.sources$Sizecat == "Trap"))
+  ] <- "Large"
+Data.sources$Group[
+  which(Data.sources$Depth > 190 & Data.sources$Sizecat == "Small")
+  ] <- "Small"
+Data.sources$Group[
+  which(Data.sources$Depth > 190 & Data.sources$Sizecat == "Submicron")
+  ] <- "Submicron"
+Data.sources <- subset(Data.sources, !is.na(Group))
+
+Data.zoops <- subset(Data.all,
+                     Group == "Mixed" | Group == "Taxa")
+
+
+```
+
+Next we need to decide which particle samples represent likely sources of organic matter to the zooplankton food web and which do not. We will do this by comparing the $\dN$ values of Phe and Lys between zooplankton and particles.
+
+First let's take a look at all our organic matter sources and decide if there are any we can exclude right off the bat.
+
+```{r Source-filtering-all, dpi=300, fig.width=5, fig.asp=0.8}
+
+ggplot()+
+  geom_point(data = Data.sources,
+             aes(x=d15NPhe, y=d15NLys, color=Group),
+             size = 3)+
+  geom_point(data = Data.zoops,
+             aes(x=d15NPhe, y=d15NLys, shape=Size),
+             size = 2)+
+  labs(shape="Zooplankton",
+       color="Particles")+
+  ylab(expression(delta^{15}*N[" Lys"]))+
+  xlab(expression(delta^{15}*N[" Phe"]))
+
+```
+
+This strongly suggests that submicron particles are not relevant to organic matter supply and can thus be excluded from our analysis.
+
+Now let's have a look at surface particles and zooplankton and see if there is some subset of surface particles that are more relevant to our study.
+
+```{r Source-filtering-surface, dpi=300, fig.width=5, fig.asp=0.8}
+ggplot()+
+  geom_point(data = subset(Data.sources, 
+                           Group == "Surface"),
+             aes(x=d15NPhe, y=d15NLys, color=Size),
+             size = 3)+
+  geom_point(data = subset(Data.zoops, 
+                           (Depth < 100 & Event == "Night") |
+                           (Type == "Metridia" | Type == "Neocalanus")),
+             aes(x=d15NPhe, y=d15NLys, shape=interaction(Size,Type)),
+             size = 2)+
+  labs(shape="Zooplankton",
+       color="Particles")+
+  ylab(expression(delta^{15}*N[" Lys"]))+
+  xlab(expression(delta^{15}*N[" Phe"]))
+
+```
+
+Here we can see a large subset of surface particles have higher $\dN$ values in Phe and Lys than any zooplankton that may conceivable feed on them. Let's refilter the original data such that those samples are excluded from this organic matter source. We will also forget about submicron particles too.
+
+```{r filter-V2, dpi=300, fig.width=5, fig.asp=0.8}
+## FILTERING DATA ##
+
+Data.sources <- subset(Data.all, Type == "Particle" | Type == "Trap")
+Data.sources$Group <- factor(NA, levels = Sources)
+Data.sources$Group[
+  which(Data.sources$Depth < 100 &
+        Data.sources$d15NLys < 0.5)
+  ] <- "Surface"
+Data.sources$Group[
+  which(Data.sources$Depth > 190 & 
+        (Data.sources$Sizecat == "Large" | Data.sources$Sizecat == "Trap"))
+  ] <- "Large"
+Data.sources$Group[
+  which(Data.sources$Depth > 190 & Data.sources$Sizecat == "Small")
+  ] <- "Small"
+Data.sources <- subset(Data.sources, !is.na(Group))
+
+## PLOTTING ##
+
+ggplot()+
+  geom_point(data = subset(Data.sources, 
+                           Group == "Surface"),
+             aes(x=d15NPhe, y=d15NLys, color=Size),
+             size = 3)+
+  geom_point(data = subset(Data.zoops, 
+                           (Depth < 100 & Event == "Night") |
+                           (Type == "Metridia" | Type == "Neocalanus")),
+             aes(x=d15NPhe, y=d15NLys, shape=interaction(Size,Type)),
+             size = 2)+
+  labs(shape="Zooplankton",
+       color="Particles")+
+  ylab(expression(delta^{15}*N[" Lys"]))+
+  xlab(expression(delta^{15}*N[" Phe"]))
+
+ggplot()+
+  geom_point(data = Data.sources,
+             aes(x=d15NPhe, y=d15NLys, color=Group),
+             size = 3)+
+  geom_point(data = Data.zoops,
+             aes(x=d15NPhe, y=d15NLys, shape=Size),
+             size = 2)+
+  labs(shape="Zooplankton",
+       color="Particles")+
+  ylab(expression(delta^{15}*N[" Lys"]))+
+  xlab(expression(delta^{15}*N[" Phe"]))
+
+```
+
+Given the small amount of trophic discrimination we expect to see in Lys this data makes sense, with the majority of zooplankton fallingn within the $\dN$ domain for Phe.
+
+Next we need to deal with any gaps that exist in our data. There are essentially two ways to go about this.
+
+  1. We can omit any samples for which all tracer data is not available. This is the most straightforward method and is the ideal option for data sets where data from few or no amino acids are missing. In such cases it would be preferable to exclude any samples or tracers for which data is lacking from the analysis all-together.
+  2. We can find the mean and variance of each tracer within each organic matter source group, and then simulate a complete data set that is representative of the values and variability observed in the original, incomplete data. This may be useful in cases where $\dN$ data is available for a large number of samples, but $\dC$ data is only available for a small number of samples from each organic matter supply source. the main assumption being made here is that variability in the sample population is accurately captured by either the propagated analytical uncertainty or standard deviation within each organic matter source population. This assumption may not always be true, and so care should be taken to make conservative estimates of uncertainty when tracer variablity within each source is poorly characterized.
+  
+
+```{r gap_removal}
+
+## DEALING WITH GAPS IN THE DATA ##
+
+# Should representative samples of organic matter end members be simulated
+# from available data? (useful if a large number of samples have only δ13C or 
+# δ15N data). If FALSE, samples without values for all tracers will be excluded.
+simulate_rep <- FALSE # SHOULD CHOOSE FALSE BY DEFAULT
+Data.sources_orig <- Data.sources
+
+## if we chose not to simulate representative samples...
+if (simulate_rep == FALSE) { 
+  Data.sources <- na.omit(Data.sources_orig[c(variables,tracers)]) # all samples containing NAs will be removed from data
+  ## we will also find the mean tracer value for each source group
+  src.mn <- aggregate(Data.sources_orig[tracers], # aggregate source data
+                      by=list(Group = Data.sources_orig[[Source_Variable]]), # by organic matter source group
+                      FUN = mean, na.rm=TRUE)[-1] # taking a mean
+  
+## if we chose to simulate representative samples...
+} else {
+  ## first we will find the mean tracer value for each source group
+  src.mn <- aggregate(Data.sources_orig[tracers], # aggregate source data
+                      by=list(Group = Data.sources_orig[[Source_Variable]]), # by organic matter source group
+                      FUN = mean, na.rm=TRUE)[-1] # taking a mean
+  ## Next we will find the most conservative estimate of tracer variance within 
+  ## each source group
+  # we will calculate the standard deviation within each population
+  src.SD.pop <- aggregate(Data.sources_orig[tracers], # aggregate source data
+                          by=list(Group = Data.sources_orig[[Source_Variable]]), # by organic matter source group
+                          FUN = sd, na.rm=TRUE)[-1] # calculating SD within the population
+  colnames(src.SD.pop) <- c(SDtracers)
+  # we will also propagate analytical uncertainty through the averaging equation
+  src.SD.prop <- aggregate(Data.sources_orig[SDtracers], # aggregate source data SDs
+                           by=list(Group = Data.sources_orig[[Source_Variable]]), # by organic matter source group
+                           FUN = SDmean, na.rm=TRUE)[-1] # calculating the SD propagated through the averaging equation
+  # and we will select the greater of the two estimates of uncertainty
+  src.SD <- pmax(src.SD.pop, src.SD.prop, na.rm=TRUE)
+  ## Now we will simulate n samples for each organic matter source group
+  nsams <- 10 # number of samples to simulate from each source
+  Data.sources <- data.frame(matrix(nrow = nsams*length(Sources), ncol = length(tracers)+1)) # initializing empty data frame
+  colnames(Data.sources) <- c(tracers,Source_Variable) # naming columns
+  set.seed(123) # set seed for repeatable sample synthesis
+  for (i in 1:length(tracers)) { # loop over each tracer
+    Data.sources[[tracers[i]]] <- rnorm(n = nsams*length(Sources), # pulling n samples from a normal distribution
+                                        mean = src.mn[[tracers[i]]], # with a given mean
+                                        sd = src.SD[[SDtracers[i]]]) # and given SD
+  }
+  for (i in variables) {
+    Data.sources[[i]] <- seq(1,nsams*length(Sources))
+  }
+  Data.sources[[Source_Variable]] <- rep(Sources,nsams)
+}
+
+```
+
+We will also mean normalize essential amino acid $\dC$ data and store the mean essential amino acid $\dC$ value, if indicated above.
+
+```{r mean_normalization}
+meannorm_d13C = TRUE
+# If mean normalizing EAA δ13C data
+if(meannorm_d13C == TRUE) {
+  # Calculating the mean EAA δ13C value of each sample
+  MN <- rowMeans(Data.sources[tracers_d13C])
+  # Subtracting that from the EAA δ13C values for each sample
+  # and replacing raw δ13C values in main data frame with mean normalized ones
+  Data.sources[tracers_d13C] <- sweep(Data.sources[tracers_d13C], 1, MN, "-")
+  # Including the mean δ13C values as an additional tracer
+  Data.sources$d13CEAA <- MN
+  tracers <- append(tracers, "d13CEAA")
+  tracers_d13C <- append(tracers_d13C, "d13CEAA")
+  tracers_all <- c(tracers_d15N,tracers_d13C)
+}
+```
+
+# All Tracers {-}
+
+Here's the data we are able to work with for these sources of organic matter at Station Papa.
+
+```{r OSP_data}
+kable(Data.sources, format="pipe")
+```
+ 
+Now lets visualize the $\dN$ and $\dC$ values of each amino acid in each organic matter source.
+
+```{r AA_Plots_Sources, dpi=300, fig.asp=0.4}
+if (include_d13C == TRUE) {
+  sources.dC.long <- 
+    melt(Data.sources, id.vars=c(variables), measure.vars = intersect(tracers_d13C, tracers),
+         variable.name="AA")
+  sources.dC.long$AA <- sub('....','',sources.dC.long$AA)
+  sources.dC.long$iso <- "d13C"
+  if (include_d15N == FALSE) {
+    sources.long <- sources.dC.long
+  }
+}
+if (include_d15N == TRUE) {
+  sources.dN.long <- 
+    melt(Data.sources, id.vars=c(variables), measure.vars = intersect(tracers_d15N, tracers),
+         variable.name="AA")
+  sources.dN.long$AA <- sub('....','',sources.dN.long$AA)
+  sources.dN.long$iso <- "d15N"
+  if (include_d13C == FALSE) {
+    sources.long <- sources.dN.long
+  }
+}
+if (include_d13C == include_d15N) {
+  sources.long <- rbind(sources.dN.long,sources.dC.long)
+}
+# Defining the preferred order in which to reference amino acids
+sources.long$AA <- factor(sources.long$AA, levels = allAA.ord)
+
+theme_set(theme_light()+
+            theme(panel.grid.major.x = element_line(colour = NA),
+                  panel.grid.major.y = element_line(colour = "grey95"),
+                  axis.text.x = element_text(angle = 60, vjust = 1.6, hjust=1.7),
+                  axis.ticks.x = element_blank()))
+
+AA_plots <-
+  ggplot(sources.long, aes(x = AA, y = value, color = Group, group=Group))+
+  geom_point(alpha=0.6, position = position_dodge(width = 0.8))+
+  ylab(expression(delta^{15}*N*"   or   "*delta^{13}*C*" (\u2030)"))+
+  labs(color="Organic Matter Source", shape="Food Web Base", fill="Zooplankton Samples")+
+  facet_row(~iso, scales="free", space="free")+
+  geom_vline(xintercept = seq(0.5,length(sources.long$AA),1), color="grey75", lwd=0.3)
+AA_plots
+```
+
+## PERMANOVA and Tukey's pairwise comparison test {-}
+
+Our first task is to conduct a pairwise comparison tests to see which tracers can differentiate which sources at each location. We will try this in the upper mesopelagic (200-500) where we have the most data. We will do this first for Station Papa using the available $\dN$ values. We'lls also do a quick PERMANOVA assessinog if different sources have significantly different $\dN$ values.
+
+```{r tukey, dpi=300, fig.asp=1, fig.width=6.5}
+adonis2(Data.sources[tracers] ~ Group, data=Data.sources, method="euclidean")
+
+Tukey <- list()
+par(mar=c(2,8,2,0.5),mfrow=c(6,3),col.main="white")
+for (i in tracers) {
+  AOV <- aov(Data.sources[[i]] ~ Group, data = Data.sources)
+  print(i)
+  print(summary(AOV))
+  TukeyHSD(AOV, conf.level=.95)
+  Tukey[[i]] <- TukeyHSD(AOV, conf.level=.95)
+  Tukey[[i]]
+  plot(Tukey[[i]], las=1, sub=i)
+  mtext(i, side=3)
+}
+```
+
+## Correlation analysis {-}
+Now we need to assess which of these are correlated and thus may only provide redundant information
+
+```{r corel_OSP, fig.asp=1, fig.width=15}
+
+corel <- cor(Data.sources[tracers], method = "pearson")
+kable(corel, format = "pipe")
+# mean(abs(cor(Data.sources[tracers_all], method = "spearman")))
+# mean(abs(cor(Data.sources[tracers_complete], method = "spearman")))
+# mean(abs(cor(Data.sources[tracers_select], method = "spearman")))
+# mean(abs(cor(Data.sources[tracers_SAA], method = "spearman")))
+
+#create pairs plot
+pairs.panels(Data.sources[tracers], xaxt="n", yaxt="n", lm=TRUE, smoother=FALSE, stars = FALSE, scale=FALSE, ellipses = FALSE, ci=TRUE, method = "pearson")
+
+```
+
+## Principal Components Analysis {-}
+Last we will do a PCA to produce a 2-D visualization of how these groups separate in this multivariate parameter space.
+ 
+```{r PCA_OSP}                       
+# Fitting PCA and adding Type as a supplimental qualitative variable
+PCA.OSP = PCA(Data.sources[c(tracers)], scale.unit = TRUE, graph = FALSE)
+# summary(PCA.lit)
+# Plot component eigenvalues and print
+fviz_eig(PCA.OSP, addlabels = FALSE)
+
+# Plot PC1&2 results and project variable vectors and print
+fviz_pca_biplot(PCA.OSP, axes = c(1,2), col.ind = Data.sources$Group, 
+                addlabels=FALSE, addEllipses = TRUE, col.var = 'grey50', repel=TRUE)
+fviz_pca_biplot(PCA.OSP, axes = c(1,3), col.ind = Data.sources$Group, 
+                addlabels=FALSE, addEllipses = TRUE, col.var = 'grey50', repel=TRUE)
+
+# generate 3d plot of PC1 PC2 and PC3
+PCA.results <- as.data.frame(PCA.OSP$ind$coord)
+PCA.results$Type <- Data.sources$Group
+
+plot_ly(data=PCA.results, x=~Dim.1, y=~Dim.2, z=~Dim.3,
+        type="scatter3d", mode="markers", color=PCA.results$Type,
+        marker = list(line = list(color = "1", width = 0.5)))
+
+# Last let's have a look at PCA loadings
+p1<-ggplot(aes(x=rownames(PCA.OSP$var$contrib),y=PCA.OSP$var$contrib[,1]),data=NULL)+
+    geom_col()+ylab("PC1")+ggtitle("PCA Loadings")+
+    theme(axis.text.x = element_blank(),axis.title.x = element_blank(),
+          plot.title=element_text(hjust=0.5))
+p2<-ggplot(aes(x=rownames(PCA.OSP$var$contrib),y=PCA.OSP$var$contrib[,2]),data=NULL)+
+    geom_col()+ylab("PC2")+
+    theme(axis.text.x = element_blank(),axis.title.x = element_blank())
+p3<-ggplot(aes(x=rownames(PCA.OSP$var$contrib),y=PCA.OSP$var$contrib[,3]),data=NULL)+
+    geom_col()+ylab("PC3")+
+    theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1),
+          axis.title.x = element_blank())
+ggarrange(p1,p2,p3,nrow=3,heights=c(1.2,1,1.5 ))
+
+# saving out PCA results for later
+PCA.all <- PCA.OSP
+```
+
+## Linear Discriminant Analysis {-}
+Next we will carry out an LDA to see if that improves group separation.
+
+```{r LDA_OSP}
+
+# Defining a data frame with sample type in column 1 and 6 EAA's in columns 2-7.
+data.train = Data.sources[c("Group",tracers)]
+# Subsetting data to include Microalgae, Fungi, and Bacteria, 
+# and not macroalgae, plants, and seagrass
+# data.train = subset(data.train, Type == "Microalgae" | Type == "Fungi" | Type == "Bacteria")
+ntypes = nlevels(as.factor(data.train$Group))
+# fitting the model with leave one out cross validation
+LDA.test = lda(Group ~ . ,data = data.train, CV = TRUE,
+               prior = rep(1/ntypes, ntypes))
+# print model result
+# LDA.train
+
+# create a table which compares the classification of the LDA model to the actual producer type
+ct.prod.norm <- table(data.train$Group, 
+                      LDA.test$class)
+# total percent of samples correctly classified is the sum of the diagonal of this table
+noquote(c('% successfully categorized: ', sum(diag(prop.table(ct.prod.norm))))) #85% effective
+
+# Refitting the model using all of the available training data
+LDA.full = lda(Group ~ . ,data = data.train, CV = FALSE, prior = rep(1/ntypes, ntypes))
+LDA.full
+
+# save LDA for later use
+LDA.all <- LDA.full
+
+# store locations of training data in LD space for later plotting
+pred.train = predict(LDA.full, data.train[-1])
+class.train = data.frame('Type' = data.train$Group, pred.train$x)
+
+
+theme_set(theme_light()+
+            theme(panel.grid.major.x = element_line(colour = NA),
+                  panel.grid.major.y = element_line(colour = "grey95")))
+
+# Generate biplot with Zooplankton overlayed onto training data
+plot.mix.LD12 = ggplot(data = class.train, 
+                       aes(x = LD2, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  # geom_point(data = class.zoops, 
+  #            aes(x = LD2, y = LD1, shape = Predicted),color = 'black')+
+  # geom_text(data = class.zoops,
+            # aes(label=Depth),hjust=-0.2, vjust=1.1)+
+  # coord_cartesian(xlim=c(-5,5), ylim=c(-7.5,5)) + 
+  theme(legend.position = 'none')
+plot.mix.LD13 = ggplot(data = class.train, 
+                       aes(x = LD3, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) +  
+  stat_ellipse(type = 't', alpha = 0.6)+
+  # geom_point(data = class.zoops, 
+  #            aes(x = LD3, y = LD1, shape = Predicted), color = 'black')+
+  # geom_text(data = class.zoops,
+            # aes(label=Depth),hjust=-0.2, vjust=1.1)+
+  # coord_cartesian(xlim=c(-5,5), ylim=c(-7.5,5)) + 
+  labs(shape = "Zooplankton") + labs(color = "Training Data")
+grid.arrange(ncol = 2, widths = c(1,1.4), plot.mix.LD12, plot.mix.LD13, top = 'Literature Producers') + theme(legend.position = 'top')
+
+# We'll also try and put LD1, 2, and 3 on 3D axes
+plot_ly(data=class.train, x=~LD1, y=~LD2, z=~LD3,
+        type="scatter3d", mode="markers", color=class.train$Type,
+        marker = list(line = list(color = "1", width = 0.5)))
+
+# Last let's have a look at PCA loadings
+p1<-ggplot(aes(x=rownames(LDA.all[[4]]),y=LDA.all[[4]][,1]),data=NULL)+
+    geom_col()+ylab("LD1")+ggtitle("LDA Loadings")+
+    theme(axis.text.x = element_blank(),axis.title.x = element_blank(),
+          plot.title=element_text(hjust=0.5))
+p2<-ggplot(aes(x=rownames(LDA.all[[4]]),y=LDA.all[[4]][,2]),data=NULL)+
+    geom_col()+ylab("LD2")+
+    theme(axis.text.x = element_blank(),axis.title.x = element_blank())
+p3<-ggplot(aes(x=rownames(LDA.all[[4]]),y=LDA.all[[4]][,3]),data=NULL)+
+    geom_col()+ylab("LD3")+
+    theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1),
+          axis.title.x = element_blank())
+ggarrange(p1,p2,p3,nrow=3,heights=c(1.2,1,1.5 ))
+
+```
+
+
+# Just d15N {-}
+
+Now we'll run some of the same multivariate analyses but only looking at $\dNSAA$ values.
+```{r select-d15N}
+tracers <- tracers_d15N
+SDtracers <- SDtracers_d15N
+include_d13C <- FALSE
+```
+
+```{r AA_Plots_Sources-d15N, dpi=300, fig.asp=0.4}
+if (include_d13C == TRUE) {
+  sources.dC.long <- 
+    melt(Data.sources, id.vars=c(variables), measure.vars = intersect(tracers_d13C, tracers),
+         variable.name="AA")
+  sources.dC.long$AA <- sub('....','',sources.dC.long$AA)
+  sources.dC.long$iso <- "d13C"
+  if (include_d15N == FALSE) {
+    sources.long <- sources.dC.long
+  }
+}
+if (include_d15N == TRUE) {
+  sources.dN.long <- 
+    melt(Data.sources, id.vars=c(variables), measure.vars = intersect(tracers_d15N, tracers),
+         variable.name="AA")
+  sources.dN.long$AA <- sub('....','',sources.dN.long$AA)
+  sources.dN.long$iso <- "d15N"
+  if (include_d13C == FALSE) {
+    sources.long <- sources.dN.long
+  }
+}
+if (include_d13C == include_d15N) {
+  sources.long <- rbind(sources.dN.long,sources.dC.long)
+}
+# Defining the preferred order in which to reference amino acids
+sources.long$AA <- factor(sources.long$AA, levels = allAA.ord)
+
+theme_set(theme_light()+
+            theme(panel.grid.major.x = element_line(colour = NA),
+                  panel.grid.major.y = element_line(colour = "grey95"),
+                  axis.text.x = element_text(angle = 60, vjust = 1.6, hjust=1.7),
+                  axis.ticks.x = element_blank()))
+
+AA_plots <-
+  ggplot(sources.long, aes(x = AA, y = value, color = Group, group=Group))+
+  geom_point(alpha=0.6, position = position_dodge(width = 0.8))+
+  ylab(expression(delta^{15}*N*"   or   "*delta^{13}*C*" (\u2030)"))+
+  labs(color="Organic Matter Source", shape="Food Web Base", fill="Zooplankton Samples")+
+  facet_row(~iso, scales="free", space="free")+
+  geom_vline(xintercept = seq(0.5,length(sources.long$AA),1), color="grey75", lwd=0.3)
+AA_plots
+```
+  
+Our first task is to conduct a pairwise comparison tests to see which tracers can differentiate which sources at each location. We will try this in the upper mesopelagic (200-500) where we have the most data. We will do this first for Station Papa using the available $\dN$ values. We'lls also do a quick PERMANOVA assessinog if different sources have significantly different $\dN$ values.
+
+```{r tukey-d15N, dpi=300, fig.asp=0.6, fig.width=6.5}
+adonis2(Data.sources[tracers] ~ Group, data=Data.sources, method="euclidean")
+
+Tukey <- list()
+par(mar=c(2,8,2,0.5),mfrow=c(4,3),col.main="white")
+for (i in tracers) {
+  AOV <- aov(Data.sources[[i]] ~ Group, data = Data.sources)
+  print(i)
+  print(summary(AOV))
+  TukeyHSD(AOV, conf.level=.95)
+  Tukey[[i]] <- TukeyHSD(AOV, conf.level=.95)
+  Tukey[[i]]
+  plot(Tukey[[i]], las=1, sub=i)
+  mtext(i, side=3)
+}
+```
+
+## Correlation analysis {-}
+Now we need to assess which of these are correlated and thus may only provide redundant information
+
+```{r corel_OSP-d15N, fig.asp=1, fig.width=15}
+
+corel <- cor(Data.sources[tracers], method = "pearson")
+kable(corel, format = "pipe")
+# mean(abs(cor(Data.sources[tracers_all], method = "spearman")))
+# mean(abs(cor(Data.sources[tracers_complete], method = "spearman")))
+# mean(abs(cor(Data.sources[tracers_select], method = "spearman")))
+# mean(abs(cor(Data.sources[tracers_SAA], method = "spearman")))
+
+#create pairs plot
+pairs.panels(Data.sources[tracers], xaxt="n", yaxt="n", lm=TRUE, smoother=FALSE, stars = FALSE, scale=FALSE, ellipses = FALSE, ci=TRUE, method = "pearson")
+
+```
+
+## Principal Components Analysis {-}
+Last we will do a PCA to produce a 2-D visualization of how these groups separate in this multivariate parameter space.
+ 
+```{r PCA_OSP-d15N}                       
+# Fitting PCA and adding Type as a supplimental qualitative variable
+PCA.OSP = PCA(Data.sources[c(tracers)], scale.unit = TRUE, graph = FALSE)
+# summary(PCA.lit)
+# Plot component eigenvalues and print
+fviz_eig(PCA.OSP, addlabels = FALSE)
+
+# Plot PC1&2 results and project variable vectors and print
+fviz_pca_biplot(PCA.OSP, axes = c(1,2), col.ind = Data.sources$Group, 
+                addlabels=FALSE, addEllipses = TRUE, col.var = 'grey50', repel=TRUE)
+fviz_pca_biplot(PCA.OSP, axes = c(1,3), col.ind = Data.sources$Group, 
+                addlabels=FALSE, addEllipses = TRUE, col.var = 'grey50', repel=TRUE)
+
+# generate 3d plot of PC1 PC2 and PC3
+PCA.results <- as.data.frame(PCA.OSP$ind$coord)
+PCA.results$Type <- Data.sources$Group
+
+plot_ly(data=PCA.results, x=~Dim.1, y=~Dim.2, z=~Dim.3,
+        type="scatter3d", mode="markers", color=PCA.results$Type,
+        marker = list(line = list(color = "1", width = 0.5)))
+
+# saving out PCA results for later
+PCA.SAA <- PCA.OSP
+```
+
+## Linear Discriminant Analysis {-}
+Next we will carry out an LDA to see if that improves group separation.
+
+```{r LDA_OSP-d15N}
+
+# Defining a data frame with sample type in column 1 and 6 EAA's in columns 2-7.
+data.train = Data.sources[c("Group",tracers)]
+# Subsetting data to include Microalgae, Fungi, and Bacteria, 
+# and not macroalgae, plants, and seagrass
+# data.train = subset(data.train, Type == "Microalgae" | Type == "Fungi" | Type == "Bacteria")
+ntypes = nlevels(as.factor(data.train$Group))
+# fitting the model with leave one out cross validation
+LDA.test = lda(Group ~ . ,data = data.train, CV = TRUE,
+               prior = rep(1/ntypes, ntypes))
+# print model result
+# LDA.train
+
+# create a table which compares the classification of the LDA model to the actual producer type
+ct.prod.norm <- table(data.train$Group, 
+                      LDA.test$class)
+# total percent of samples correctly classified is the sum of the diagonal of this table
+noquote(c('% successfully categorized: ', sum(diag(prop.table(ct.prod.norm))))) #85% effective
+
+# Refitting the model using all of the available training data
+LDA.full = lda(Group ~ . ,data = data.train, CV = FALSE, prior = rep(1/ntypes, ntypes))
+LDA.full
+
+# save LDA for later use
+LDA.SAA <- LDA.full
+
+# store locations of training data in LD space for later plotting
+pred.train = predict(LDA.full, data.train[-1])
+class.train = data.frame('Type' = data.train$Group, pred.train$x)
+
+
+theme_set(theme_light()+
+            theme(panel.grid.major.x = element_line(colour = NA),
+                  panel.grid.major.y = element_line(colour = "grey95")))
+
+# Generate biplot with Zooplankton overlayed onto training data
+plot.mix.LD12 = ggplot(data = class.train, 
+                       aes(x = LD2, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  # geom_point(data = class.zoops, 
+  #            aes(x = LD2, y = LD1, shape = Predicted),color = 'black')+
+  # geom_text(data = class.zoops,
+            # aes(label=Depth),hjust=-0.2, vjust=1.1)+
+  # coord_cartesian(xlim=c(-5,5), ylim=c(-7.5,5)) + 
+  theme(legend.position = 'none')
+plot.mix.LD13 = ggplot(data = class.train, 
+                       aes(x = LD3, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) +  
+  stat_ellipse(type = 't', alpha = 0.6)+
+  # geom_point(data = class.zoops, 
+  #            aes(x = LD3, y = LD1, shape = Predicted), color = 'black')+
+  # geom_text(data = class.zoops,
+            # aes(label=Depth),hjust=-0.2, vjust=1.1)+
+  # coord_cartesian(xlim=c(-5,5), ylim=c(-7.5,5)) + 
+  labs(shape = "Zooplankton") + labs(color = "Training Data")
+grid.arrange(ncol = 2, widths = c(1,1.4), plot.mix.LD12, plot.mix.LD13, top = 'Literature Producers') + theme(legend.position = 'top')
+
+# We'll also try and put LD1, 2, and 3 on 3D axes
+plot_ly(data=class.train, x=~LD1, y=~LD2, z=~LD3,
+        type="scatter3d", mode="markers", color=class.train$Type,
+        marker = list(line = list(color = "1", width = 0.5)))
+```
+
+
+
+# Just SAAs {-}
+
+Now we'll run some of the same multivariate analyses but only looking at $\dNSAA$ values.
+```{r select-SAAs}
+tracers <- tracers_SAA
+SDtracers <- SDtracers_SAA
+include_d13C <- FALSE
+```
+
+```{r AA_Plots_Sources_SAAs, dpi=300, fig.asp=0.4}
+if (include_d13C == TRUE) {
+  sources.dC.long <- 
+    melt(Data.sources, id.vars=c(variables), measure.vars = intersect(tracers_d13C, tracers),
+         variable.name="AA")
+  sources.dC.long$AA <- sub('....','',sources.dC.long$AA)
+  sources.dC.long$iso <- "d13C"
+  if (include_d15N == FALSE) {
+    sources.long <- sources.dC.long
+  }
+}
+if (include_d15N == TRUE) {
+  sources.dN.long <- 
+    melt(Data.sources, id.vars=c(variables), measure.vars = intersect(tracers_d15N, tracers),
+         variable.name="AA")
+  sources.dN.long$AA <- sub('....','',sources.dN.long$AA)
+  sources.dN.long$iso <- "d15N"
+  if (include_d13C == FALSE) {
+    sources.long <- sources.dN.long
+  }
+}
+if (include_d13C == include_d15N) {
+  sources.long <- rbind(sources.dN.long,sources.dC.long)
+}
+# Defining the preferred order in which to reference amino acids
+sources.long$AA <- factor(sources.long$AA, levels = allAA.ord)
+
+theme_set(theme_light()+
+            theme(panel.grid.major.x = element_line(colour = NA),
+                  panel.grid.major.y = element_line(colour = "grey95"),
+                  axis.text.x = element_text(angle = 60, vjust = 1.6, hjust=1.7),
+                  axis.ticks.x = element_blank()))
+
+AA_plots <-
+  ggplot(sources.long, aes(x = AA, y = value, color = Group, group=Group))+
+  geom_point(alpha=0.6, position = position_dodge(width = 0.8))+
+  ylab(expression(delta^{15}*N*"   or   "*delta^{13}*C*" (\u2030)"))+
+  labs(color="Organic Matter Source", shape="Food Web Base", fill="Zooplankton Samples")+
+  facet_row(~iso, scales="free", space="free")+
+  geom_vline(xintercept = seq(0.5,length(sources.long$AA),1), color="grey75", lwd=0.3)
+AA_plots
+```
+  
+## Principal Components Analysis {-}
+Last we will do a PCA to produce a 2-D visualization of how these groups separate in this multivariate parameter space.
+ 
+```{r PCA_OSP_SAAs}                       
+# Fitting PCA and adding Type as a supplimental qualitative variable
+PCA.OSP = PCA(Data.sources[c(tracers)], scale.unit = TRUE, graph = FALSE)
+# summary(PCA.lit)
+# Plot component eigenvalues and print
+fviz_eig(PCA.OSP, addlabels = FALSE)
+
+# Plot PC1&2 results and project variable vectors and print
+fviz_pca_biplot(PCA.OSP, axes = c(1,2), col.ind = Data.sources$Group, 
+                addlabels=FALSE, addEllipses = TRUE, col.var = 'grey50', repel=TRUE)
+fviz_pca_biplot(PCA.OSP, axes = c(1,3), col.ind = Data.sources$Group, 
+                addlabels=FALSE, addEllipses = TRUE, col.var = 'grey50', repel=TRUE)
+
+# generate 3d plot of PC1 PC2 and PC3
+PCA.results <- as.data.frame(PCA.OSP$ind$coord)
+PCA.results$Type <- Data.sources$Group
+
+plot_ly(data=PCA.results, x=~Dim.1, y=~Dim.2, z=~Dim.3,
+        type="scatter3d", mode="markers", color=PCA.results$Type,
+        marker = list(line = list(color = "1", width = 0.5)))
+
+# saving out PCA results for later
+PCA.SAA <- PCA.OSP
+```
+
+## Linear Discriminant Analysis {-}
+Next we will carry out an LDA to see if that improves group separation.
+
+```{r LDA_OSP_SAAs}
+
+# Defining a data frame with sample type in column 1 and 6 EAA's in columns 2-7.
+data.train = Data.sources[c("Group",tracers)]
+# Subsetting data to include Microalgae, Fungi, and Bacteria, 
+# and not macroalgae, plants, and seagrass
+# data.train = subset(data.train, Type == "Microalgae" | Type == "Fungi" | Type == "Bacteria")
+ntypes = nlevels(as.factor(data.train$Group))
+# fitting the model with leave one out cross validation
+LDA.test = lda(Group ~ . ,data = data.train, CV = TRUE,
+               prior = rep(1/ntypes, ntypes))
+# print model result
+# LDA.train
+
+# create a table which compares the classification of the LDA model to the actual producer type
+ct.prod.norm <- table(data.train$Group, 
+                      LDA.test$class)
+# total percent of samples correctly classified is the sum of the diagonal of this table
+noquote(c('% successfully categorized: ', sum(diag(prop.table(ct.prod.norm))))) #85% effective
+
+# Refitting the model using all of the available training data
+LDA.full = lda(Group ~ . ,data = data.train, CV = FALSE, prior = rep(1/ntypes, ntypes))
+LDA.full
+
+# save LDA for later use
+LDA.SAA <- LDA.full
+
+# store locations of training data in LD space for later plotting
+pred.train = predict(LDA.full, data.train[-1])
+class.train = data.frame('Type' = data.train$Group, pred.train$x)
+
+
+theme_set(theme_light()+
+            theme(panel.grid.major.x = element_line(colour = NA),
+                  panel.grid.major.y = element_line(colour = "grey95")))
+
+# Generate biplot with Zooplankton overlayed onto training data
+plot.mix.LD12 = ggplot(data = class.train, 
+                       aes(x = LD2, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  # geom_point(data = class.zoops, 
+  #            aes(x = LD2, y = LD1, shape = Predicted),color = 'black')+
+  # geom_text(data = class.zoops,
+            # aes(label=Depth),hjust=-0.2, vjust=1.1)+
+  # coord_cartesian(xlim=c(-5,5), ylim=c(-7.5,5)) + 
+  theme(legend.position = 'none')
+plot.mix.LD13 = ggplot(data = class.train, 
+                       aes(x = LD3, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) +  
+  stat_ellipse(type = 't', alpha = 0.6)+
+  # geom_point(data = class.zoops, 
+  #            aes(x = LD3, y = LD1, shape = Predicted), color = 'black')+
+  # geom_text(data = class.zoops,
+            # aes(label=Depth),hjust=-0.2, vjust=1.1)+
+  # coord_cartesian(xlim=c(-5,5), ylim=c(-7.5,5)) + 
+  labs(shape = "Zooplankton") + labs(color = "Training Data")
+grid.arrange(ncol = 2, widths = c(1,1.4), plot.mix.LD12, plot.mix.LD13, top = 'Literature Producers') + theme(legend.position = 'top')
+
+# We'll also try and put LD1, 2, and 3 on 3D axes
+plot_ly(data=class.train, x=~LD1, y=~LD2, z=~LD3,
+        type="scatter3d", mode="markers", color=class.train$Type,
+        marker = list(line = list(color = "1", width = 0.5)))
+```
+
+
+
+# Select AA $\dN$ values {-}
+
+Now we'll run some of the same multivariate analyses but only looking at $\dNSAA$ values.
+```{r select-select}
+tracers <- tracers_select
+SDtracers <- SDtracers_select
+include_d13C <- FALSE
+```
+
+```{r AA_Plots_Sources_select, dpi=300, fig.asp=0.4}
+if (include_d13C == TRUE) {
+  sources.dC.long <- 
+    melt(Data.sources, id.vars=c(variables), measure.vars = intersect(tracers_d13C, tracers),
+         variable.name="AA")
+  sources.dC.long$AA <- sub('....','',sources.dC.long$AA)
+  sources.dC.long$iso <- "d13C"
+  if (include_d15N == FALSE) {
+    sources.long <- sources.dC.long
+  }
+}
+if (include_d15N == TRUE) {
+  sources.dN.long <- 
+    melt(Data.sources, id.vars=c(variables), measure.vars = intersect(tracers_d15N, tracers),
+         variable.name="AA")
+  sources.dN.long$AA <- sub('....','',sources.dN.long$AA)
+  sources.dN.long$iso <- "d15N"
+  if (include_d13C == FALSE) {
+    sources.long <- sources.dN.long
+  }
+}
+if (include_d13C == include_d15N) {
+  sources.long <- rbind(sources.dN.long,sources.dC.long)
+}
+# Defining the preferred order in which to reference amino acids
+sources.long$AA <- factor(sources.long$AA, levels = allAA.ord)
+
+theme_set(theme_light()+
+            theme(panel.grid.major.x = element_line(colour = NA),
+                  panel.grid.major.y = element_line(colour = "grey95"),
+                  axis.text.x = element_text(angle = 60, vjust = 1.6, hjust=1.7),
+                  axis.ticks.x = element_blank()))
+
+AA_plots <-
+  ggplot(sources.long, aes(x = AA, y = value, color = Group, group=Group))+
+  geom_point(alpha=0.6, position = position_dodge(width = 0.8))+
+  ylab(expression(delta^{15}*N*"   or   "*delta^{13}*C*" (\u2030)"))+
+  labs(color="Organic Matter Source", shape="Food Web Base", fill="Zooplankton Samples")+
+  facet_row(~iso, scales="free", space="free")+
+  geom_vline(xintercept = seq(0.5,length(sources.long$AA),1), color="grey75", lwd=0.3)
+AA_plots
+```
+  
+## Principal Components Analysis {-}
+Last we will do a PCA to produce a 2-D visualization of how these groups separate in this multivariate parameter space.
+ 
+```{r PCA_OSP_select}                       
+# Fitting PCA and adding Type as a supplimental qualitative variable
+PCA.OSP = PCA(Data.sources[c(tracers)], scale.unit = TRUE, graph = FALSE)
+# summary(PCA.lit)
+# Plot component eigenvalues and print
+fviz_eig(PCA.OSP, addlabels = FALSE)
+
+# Plot PC1&2 results and project variable vectors and print
+fviz_pca_biplot(PCA.OSP, axes = c(1,2), col.ind = Data.sources$Group, 
+                addlabels=FALSE, addEllipses = TRUE, col.var = 'grey50', repel=TRUE)
+fviz_pca_biplot(PCA.OSP, axes = c(1,3), col.ind = Data.sources$Group, 
+                addlabels=FALSE, addEllipses = TRUE, col.var = 'grey50', repel=TRUE)
+
+# generate 3d plot of PC1 PC2 and PC3
+PCA.results <- as.data.frame(PCA.OSP$ind$coord)
+PCA.results$Type <- Data.sources$Group
+
+plot_ly(data=PCA.results, x=~Dim.1, y=~Dim.2, z=~Dim.3,
+        type="scatter3d", mode="markers", color=PCA.results$Type,
+        marker = list(line = list(color = "1", width = 0.5)))
+
+# saving out PCA results for later
+PCA.select <- PCA.OSP
+```
+
+## Linear Discriminant Analysis {-}
+Next we will carry out an LDA to see if that improves group separation.
+
+```{r LDA_OSP_select}
+
+# Defining a data frame with sample type in column 1 and 6 EAA's in columns 2-7.
+data.train = Data.sources[c("Group",tracers)]
+# Subsetting data to include Microalgae, Fungi, and Bacteria, 
+# and not macroalgae, plants, and seagrass
+# data.train = subset(data.train, Type == "Microalgae" | Type == "Fungi" | Type == "Bacteria")
+ntypes = nlevels(as.factor(data.train$Group))
+# fitting the model with leave one out cross validation
+LDA.test = lda(Group ~ . ,data = data.train, CV = TRUE,
+               prior = rep(1/ntypes, ntypes))
+# print model result
+# LDA.train
+
+# create a table which compares the classification of the LDA model to the actual producer type
+ct.prod.norm <- table(data.train$Group, 
+                      LDA.test$class)
+# total percent of samples correctly classified is the sum of the diagonal of this table
+noquote(c('% successfully categorized: ', sum(diag(prop.table(ct.prod.norm))))) #85% effective
+
+# Refitting the model using all of the available training data
+LDA.full = lda(Group ~ . ,data = data.train, CV = FALSE, prior = rep(1/ntypes, ntypes))
+LDA.full
+
+# save LDA for later use
+LDA.select <- LDA.full
+
+# store locations of training data in LD space for later plotting
+pred.train = predict(LDA.full, data.train[-1])
+class.train = data.frame('Type' = data.train$Group, pred.train$x)
+
+
+theme_set(theme_light()+
+            theme(panel.grid.major.x = element_line(colour = NA),
+                  panel.grid.major.y = element_line(colour = "grey95")))
+
+# Generate biplot with Zooplankton overlayed onto training data
+plot.mix.LD12 = ggplot(data = class.train, 
+                       aes(x = LD2, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  # geom_point(data = class.zoops, 
+  #            aes(x = LD2, y = LD1, shape = Predicted),color = 'black')+
+  # geom_text(data = class.zoops,
+            # aes(label=Depth),hjust=-0.2, vjust=1.1)+
+  # coord_cartesian(xlim=c(-5,5), ylim=c(-7.5,5)) + 
+  theme(legend.position = 'none')
+plot.mix.LD13 = ggplot(data = class.train, 
+                       aes(x = LD3, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) +  
+  stat_ellipse(type = 't', alpha = 0.6)+
+  # geom_point(data = class.zoops, 
+  #            aes(x = LD3, y = LD1, shape = Predicted), color = 'black')+
+  # geom_text(data = class.zoops,
+            # aes(label=Depth),hjust=-0.2, vjust=1.1)+
+  # coord_cartesian(xlim=c(-5,5), ylim=c(-7.5,5)) + 
+  labs(shape = "Zooplankton") + labs(color = "Training Data")
+grid.arrange(ncol = 2, widths = c(1,1.4), plot.mix.LD12, plot.mix.LD13, top = 'Literature Producers') + theme(legend.position = 'top')
+
+# We'll also try and put LD1, 2, and 3 on 3D axes
+plot_ly(data=class.train, x=~LD1, y=~LD2, z=~LD3,
+        type="scatter3d", mode="markers", color=class.train$Type,
+        marker = list(line = list(color = "1", width = 0.5)))
+```
+
+# Select AA $\dN$ values with 4 EAA $\dC$ values {-}
+
+Now we'll run some of the same multivariate analyses but only looking at $\dNSAA$ values.
+```{r select-complete}
+tracers <- tracers_complete
+SDtracers <- SDtracers_complete
+include_d13C <- TRUE
+```
+
+```{r AA_Plots_Sources_complete, dpi=300, fig.asp=0.4}
+if (include_d13C == TRUE) {
+  sources.dC.long <- 
+    melt(Data.sources, id.vars=c(variables), measure.vars = intersect(tracers_d13C, tracers),
+         variable.name="AA")
+  sources.dC.long$AA <- sub('....','',sources.dC.long$AA)
+  sources.dC.long$iso <- "d13C"
+  if (include_d15N == FALSE) {
+    sources.long <- sources.dC.long
+  }
+}
+if (include_d15N == TRUE) {
+  sources.dN.long <- 
+    melt(Data.sources, id.vars=c(variables), measure.vars = intersect(tracers_d15N, tracers),
+         variable.name="AA")
+  sources.dN.long$AA <- sub('....','',sources.dN.long$AA)
+  sources.dN.long$iso <- "d15N"
+  if (include_d13C == FALSE) {
+    sources.long <- sources.dN.long
+  }
+}
+if (include_d13C == include_d15N) {
+  sources.long <- rbind(sources.dN.long,sources.dC.long)
+}
+# Defining the preferred order in which to reference amino acids
+sources.long$AA <- factor(sources.long$AA, levels = allAA.ord)
+
+theme_set(theme_light()+
+            theme(panel.grid.major.x = element_line(colour = NA),
+                  panel.grid.major.y = element_line(colour = "grey95"),
+                  axis.text.x = element_text(angle = 60, vjust = 1.6, hjust=1.7),
+                  axis.ticks.x = element_blank()))
+
+AA_plots <-
+  ggplot(sources.long, aes(x = AA, y = value, color = Group, group=Group))+
+  geom_point(alpha=0.6, position = position_dodge(width = 0.8))+
+  ylab(expression(delta^{15}*N*"   or   "*delta^{13}*C*" (\u2030)"))+
+  labs(color="Organic Matter Source", shape="Food Web Base", fill="Zooplankton Samples")+
+  facet_row(~iso, scales="free", space="free")+
+  geom_vline(xintercept = seq(0.5,length(sources.long$AA),1), color="grey75", lwd=0.3)+
+  theme_light()+theme(text=element_text(family="serif"))
+AA_plots
+```
+  
+## Principal Components Analysis {-}
+Last we will do a PCA to produce a 2-D visualization of how these groups separate in this multivariate parameter space.
+ 
+```{r PCA_OSP_complete}                       
+# Fitting PCA and adding Type as a supplimental qualitative variable
+PCA.OSP = PCA(Data.sources[c(tracers)], scale.unit = TRUE, graph = FALSE)
+# summary(PCA.lit)
+# Plot component eigenvalues and print
+fviz_eig(PCA.OSP, addlabels = FALSE)
+
+# Plot PC1&2 results and project variable vectors and print
+fviz_pca_biplot(PCA.OSP, axes = c(1,2), col.ind = Data.sources$Group, 
+                addlabels=FALSE, addEllipses = TRUE, col.var = 'grey50', repel=TRUE)
+fviz_pca_biplot(PCA.OSP, axes = c(1,3), col.ind = Data.sources$Group, 
+                addlabels=FALSE, addEllipses = TRUE, col.var = 'grey50', repel=TRUE)
+
+# generate 3d plot of PC1 PC2 and PC3
+PCA.results <- as.data.frame(PCA.OSP$ind$coord)
+PCA.results$Type <- Data.sources$Group
+
+plot_ly(data=PCA.results, x=~Dim.1, y=~Dim.2, z=~Dim.3,
+        type="scatter3d", mode="markers", color=PCA.results$Type,
+        marker = list(line = list(color = "1", width = 0.5)))
+
+# saving out PCA results for later
+PCA.complete <- PCA.OSP
+```
+
+## Linear Discriminant Analysis {-}
+Next we will carry out an LDA to see if that improves group separation.
+
+```{r LDA_OSP_complete}
+
+# Defining a data frame with sample type in column 1 and 6 EAA's in columns 2-7.
+data.train = Data.sources[c("Group",tracers)]
+# Subsetting data to include Microalgae, Fungi, and Bacteria, 
+# and not macroalgae, plants, and seagrass
+# data.train = subset(data.train, Type == "Microalgae" | Type == "Fungi" | Type == "Bacteria")
+ntypes = nlevels(as.factor(data.train$Group))
+# fitting the model with leave one out cross validation
+LDA.test = lda(Group ~ . ,data = data.train, CV = TRUE,
+               prior = rep(1/ntypes, ntypes))
+# print model result
+# LDA.train
+
+# create a table which compares the classification of the LDA model to the actual producer type
+ct.prod.norm <- table(data.train$Group, 
+                      LDA.test$class)
+# total percent of samples correctly classified is the sum of the diagonal of this table
+noquote(c('% successfully categorized: ', sum(diag(prop.table(ct.prod.norm))))) #85% effective
+
+# Refitting the model using all of the available training data
+LDA.full = lda(Group ~ . ,data = data.train, CV = FALSE, prior = rep(1/ntypes, ntypes))
+LDA.full
+
+# save LDA for later use
+LDA.complete <- LDA.full
+
+# store locations of training data in LD space for later plotting
+pred.train = predict(LDA.full, data.train[-1])
+class.train = data.frame('Type' = data.train$Group, pred.train$x)
+
+
+theme_set(theme_light()+
+            theme(panel.grid.major.x = element_line(colour = NA),
+                  panel.grid.major.y = element_line(colour = "grey95")))
+
+# Generate biplot with Zooplankton overlayed onto training data
+plot.mix.LD12 = ggplot(data = class.train, 
+                       aes(x = LD2, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  # geom_point(data = class.zoops, 
+  #            aes(x = LD2, y = LD1, shape = Predicted),color = 'black')+
+  # geom_text(data = class.zoops,
+            # aes(label=Depth),hjust=-0.2, vjust=1.1)+
+  # coord_cartesian(xlim=c(-5,5), ylim=c(-7.5,5)) + 
+  theme(legend.position = 'none')
+plot.mix.LD13 = ggplot(data = class.train, 
+                       aes(x = LD3, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) +  
+  stat_ellipse(type = 't', alpha = 0.6)+
+  # geom_point(data = class.zoops, 
+  #            aes(x = LD3, y = LD1, shape = Predicted), color = 'black')+
+  # geom_text(data = class.zoops,
+            # aes(label=Depth),hjust=-0.2, vjust=1.1)+
+  # coord_cartesian(xlim=c(-5,5), ylim=c(-7.5,5)) + 
+  labs(shape = "Zooplankton") + labs(color = "Training Data")
+grid.arrange(ncol = 2, widths = c(1,1.4), plot.mix.LD12, plot.mix.LD13, top = 'Literature Producers') + theme(legend.position = 'top')
+
+# We'll also try and put LD1, 2, and 3 on 3D axes
+plot_ly(data=class.train, x=~LD1, y=~LD2, z=~LD3,
+        type="scatter3d", mode="markers", color=class.train$Type,
+        marker = list(line = list(color = "1", width = 0.5)))
+```
+
+# Summary Plots {-}
+
+Next we're going to generate some plots, summarizing how the our explanatory power changes as a function of the tracers included. To do this we'll try and plot results from PCAs and LDAs, paired with the variance explained by each dimension.
+
+```{r summary_plots, dpi=300, fig.asp=0.4, fig.width=8.5}
+
+var.exp.PCA <- 
+  data.frame("AAs" = 
+               factor(c("SAAs","Select d15N","Select d15N + d13C","All d15N + d13C"),
+                      levels = c("SAAs","Select d15N","Select d15N + d13C","All d15N + d13C")))
+var.exp.PCA[1,c("Dim1","Dim2","Dim3")] <- PCA.SAA$eig[1:3,2]
+var.exp.PCA[2,c("Dim1","Dim2","Dim3")] <- PCA.select$eig[1:3,2]
+var.exp.PCA[3,c("Dim1","Dim2","Dim3")] <- PCA.complete$eig[1:3,2]
+var.exp.PCA[4,c("Dim1","Dim2","Dim3")] <- PCA.all$eig[1:3,2]
+
+var.exp.PCA.long <- 
+  melt(var.exp.PCA,id.vars = "AAs", value.name = "Variance_Explained", variable.name = "Dimension")
+
+ggplot(data = var.exp.PCA.long, aes(x=AAs, y=Variance_Explained, 
+                                    fill = Dimension, group = Dimension))+
+  geom_col(position = "fill")+
+  ggtitle("Relative Variance Explained by 1st 3 PCA Dimensions")+
+  xlab("Tracer Suite") + ylab("% of Variance Explained")+
+  scale_fill_manual(values=c("steelblue1","royalblue1","royalblue4"))+
+  scale_color_manual(values=c("steelblue1","royalblue1","royalblue4"))
+
+
+PCA.results.SAA <- as.data.frame(PCA.SAA$ind$coord)
+PCA.results.SAA$Type <- Data.sources$Group
+
+PCA.results.select <- as.data.frame(PCA.select$ind$coord)
+PCA.results.select$Type <- Data.sources$Group
+
+PCA.results.complete <- as.data.frame(PCA.complete$ind$coord)
+PCA.results.complete$Type <- Data.sources$Group
+
+PCA.results.all <- as.data.frame(PCA.all$ind$coord)
+PCA.results.all$Type <- Data.sources$Group
+
+biplot.SAA <-
+  ggplot(data = PCA.results.SAA,
+         aes(y = Dim.2, x = Dim.1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  ggtitle(expression("SAA "*delta^{15}*"N"))+
+  xlab(paste("PC1(",round(var.exp.PCA[1,2],0),"%)",sep = ""))+
+  ylab(paste("PC2(",round(var.exp.PCA[1,3],0),"%)",sep = ""))+
+  theme_light()+theme(text=element_text(family="serif"))+
+  theme(legend.position = 'none')
+biplot.select <-
+  ggplot(data = PCA.results.select,
+         aes(y = Dim.2, x = Dim.1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  ggtitle(expression("Select "*delta^{15}*"N"))+
+  xlab(paste("PC1(",round(var.exp.PCA[2,2],0),"%)",sep = ""))+
+  ylab(paste("PC2(",round(var.exp.PCA[2,3],0),"%)",sep = ""))+
+  theme_light()+theme(text=element_text(family="serif"))+
+  theme(legend.position = 'none')
+biplot.complete1 <-
+  ggplot(data = PCA.results.complete,
+         aes(y = Dim.2, x = Dim.1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  ggtitle(expression("Select "*delta^{15}*"N, "*delta^{13}*"C"))+
+  xlab(NULL)+#paste("PC1(",round(var.exp.PCA[3,2],0),"%)",sep = ""))+
+  ylab(paste("PC2(",round(var.exp.PCA[3,3],0),"%)",sep = ""))+
+  theme_light()+theme(text=element_text(family="serif"))+
+  theme(legend.position = 'none')
+biplot.complete2 <-
+  ggplot(data = PCA.results.complete,
+         aes(y = Dim.3, x = Dim.1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  # ggtitle("Select d15N and EAA d13C")+
+  xlab(paste("PC1(",round(var.exp.PCA[3,2],0),"%)",sep = ""))+
+  ylab(paste("PC3(",round(var.exp.PCA[3,4],0),"%)",sep = ""))+
+  theme_light()+theme(text=element_text(family="serif"))+
+  theme(legend.position = 'none')
+biplot.all1 <-
+  ggplot(data = PCA.results.all,
+         aes(y = Dim.2, x = Dim.1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  ggtitle(expression("All "*delta^{15}*"N, "*delta^{13}*"C"))+
+  xlab(NULL)+#paste("PC1(",round(var.exp.PCA[3,2],0),"%)",sep = ""))+
+  ylab(paste("PC2(",round(var.exp.PCA[4,3],0),"%)",sep = ""))+
+  theme_light()+theme(text=element_text(family="serif"))+
+  theme(legend.position = 'none')
+biplot.all2 <-
+  ggplot(data = PCA.results.all,
+         aes(y = Dim.3, x = Dim.1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  # ggtitle("Select d15N and EAA d13C")+
+  xlab(paste("PC1(",round(var.exp.PCA[4,2],0),"%)",sep = ""))+
+  ylab(paste("PC3(",round(var.exp.PCA[4,4],0),"%)",sep = ""))+
+  theme_light()+theme(text=element_text(family="serif"))+
+  theme(legend.position = 'none')
+
+ggarrange(biplot.SAA,
+          biplot.select,
+          ggarrange(biplot.complete1,biplot.complete2,ncol=1,heights = c(1,1)), 
+          # ggarrange(biplot.all1,biplot.all2,ncol=1,heights = c(1,1)), 
+          ncol = 3)
+
+
+
+
+var.exp.LDA <- 
+  data.frame("AAs" = 
+               factor(c("SAAs","Select d15N","Select d15N + d13C","All d15N + d13C"),
+                      levels = c("SAAs","Select d15N","Select d15N + d13C","All d15N + d13C")))
+var.exp.LDA[1,c("Dim1","Dim2","Dim3")] <- LDA.SAA$svd^2/sum(LDA.SAA$svd^2)
+var.exp.LDA[2,c("Dim1","Dim2","Dim3")] <- LDA.select$svd^2/sum(LDA.select$svd^2)
+var.exp.LDA[3,c("Dim1","Dim2","Dim3")] <- LDA.complete$svd^2/sum(LDA.complete$svd^2)
+var.exp.LDA[4,c("Dim1","Dim2","Dim3")] <- LDA.all$svd^2/sum(LDA.all$svd^2)
+
+var.exp.LDA.long <- 
+  melt(var.exp.LDA,id.vars = "AAs", value.name = "Variance_Explained", variable.name = "Dimension")
+
+ggplot(data = var.exp.LDA.long, aes(x=AAs, y=Variance_Explained, 
+                                    fill = Dimension, group = Dimension))+
+  geom_col()+
+  ggtitle("Variance Explained by LDA Dimensions")+
+  xlab("Tracer Suite") + ylab("% of Variance Explained")+
+  scale_fill_manual(values=c("steelblue1","royalblue1","royalblue4"))+
+  scale_color_manual(values=c("steelblue1","royalblue1","royalblue4"))
+
+
+data.train = Data.sources[c("Group",tracers_SAA)]
+pred.train = predict(LDA.SAA, data.train[-1])
+class.train.SAA = data.frame('Type' = data.train$Group, pred.train$x)
+
+data.train = Data.sources[c("Group",tracers_select)]
+pred.train = predict(LDA.select, data.train[-1])
+class.train.select = data.frame('Type' = data.train$Group, pred.train$x)
+
+data.train = Data.sources[c("Group",tracers_complete)]
+pred.train = predict(LDA.complete, data.train[-1])
+class.train.complete= data.frame('Type' = data.train$Group, pred.train$x)
+
+data.train = Data.sources[c("Group",tracers_all)]
+pred.train = predict(LDA.all, data.train[-1])
+class.train.all= data.frame('Type' = data.train$Group, pred.train$x)
+
+biplot.SAA <-
+  ggplot(data = class.train.SAA,
+         aes(x = LD2, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  theme(legend.position = 'none')+
+  ggtitle("SAA d15N")+
+  ylab(paste("LD1(",round(var.exp.LDA[1,2]*100,0),"%)",sep = ""))+
+  xlab(paste("LD2(",round(var.exp.LDA[1,3]*100,0),"%)",sep = ""))
+biplot.select <-
+  ggplot(data = class.train.select,
+         aes(x = LD2, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  theme(legend.position = 'none')+
+  ggtitle("Select d15N")+
+  ylab(paste("LD1(",round(var.exp.LDA[2,2]*100,0),"%)",sep = ""))+
+  xlab(paste("LD2(",round(var.exp.LDA[2,3]*100,0),"%)",sep = ""))
+biplot.complete <-
+  ggplot(data = class.train.complete,
+         aes(x = LD2, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  theme(legend.position = 'none')+
+  ggtitle("Select d15N, d13C")+
+  ylab(paste("LD1(",round(var.exp.LDA[3,2]*100,0),"%)",sep = ""))+
+  xlab(paste("LD2(",round(var.exp.LDA[3,3]*100,0),"%)",sep = ""))
+biplot.all <-
+  ggplot(data = class.train.all,
+         aes(x = LD2, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.6) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  theme(legend.position = 'none')+
+  ggtitle("All d15N, d13C")+
+  ylab(paste("LD1(",round(var.exp.LDA[4,2]*100,0),"%)",sep = ""))+
+  xlab(paste("LD2(",round(var.exp.LDA[4,3]*100,0),"%)",sep = ""))
+
+ggarrange(biplot.SAA,
+          biplot.select,
+          biplot.complete,
+          biplot.all, ncol = 4)
+
+```
+
+```{r pres-fig, dpi=300, fig.width=5, fig.asp=0.8}
+
+biplot.select <-
+  ggplot(data = PCA.results.select,
+         aes(y = Dim.2, x = Dim.1, color = Type), size = 2) + 
+  geom_point(alpha = 1, size=2) + 
+  stat_ellipse(type = 't', alpha = 0.6, size=0.5)+
+  # ggtitle(expression("Select "*delta^{15}*"N"))+
+  xlab(paste("PC1(",round(var.exp.PCA[2,2],0),"%)",sep = ""))+
+  ylab(paste("PC2(",round(var.exp.PCA[2,3],0),"%)",sep = ""))+
+  theme_light()+theme(text=element_text(family="serif"))+
+  scale_color_manual(values = c("goldenrod2","red2","green3","royalblue1"))+
+  theme(legend.position = 'none')
+
+biplot.select
+```

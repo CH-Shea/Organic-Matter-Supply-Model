@@ -1,0 +1,1392 @@
+---
+title: "Organic Matter Supply Model: Analyzing data from wild zooplankton"
+author: "Connor Shea"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  #html_document: 
+  bookdown::html_document2:  
+    self-contained: yes
+    theme: cerulean #paper #cosmo #journal #readable
+    toc: true
+    smooth_scroll: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    fig_caption: yes
+    code_folding: hide
+bibliography: Utilities/MesoPelaZooAA.bib
+csl: Utilities/LnO.csl
+link-citations: yes
+---
+
+```{r setup, echo=FALSE, warning=FALSE}
+## This chunk sets up a working directory, loads packages, defines a couple functions, and sets global chunk options for the .Rmd document
+
+# clean up
+rm(list=ls()) 
+
+# fresh start? If FALSE (select 2 in hard bracket), will only rerun a chunk if 
+# changes are detected within the text of that chunk.
+rmCache <- c(TRUE, FALSE)[1] 
+tfn <- knitr::current_input()              # name of this file
+tfn <- substr(tfn, 1, nchar(tfn)-4)        # Remove the ".Rmd"
+tfn_cache <- paste0("Caches/", tfn, "_cache")         # Append "_cache" to it
+tfn_figures <- paste0("Figures/", tfn, "_figures")         # Append "_figures" to it
+if (rmCache) {
+  if (file.exists(tfn_cache))                # If the cache exists...
+    unlink(tfn_cache, recursive=TRUE)        # ...delete it.
+}
+
+# load packages quietly
+shhh <- suppressPackageStartupMessages # It's a library, so shhh!
+want <- c("knitr", 
+          "readxl", # for reading xl files
+          "MASS", # some statistics including lda
+          "vegan", # ecology statistics
+          "FactoMineR", # includes PCA function and utilities
+          "factoextra", # extra utilities for FactoMineR
+          "runjags", # To run Bayesian models
+          "TruncatedDistributions", # To generate truncate porbability distributions
+          "coda",  
+          "DT", # makes nice sortable tables
+          "openxlsx", # writes to .xlsx files
+          "compositions", 
+          "kableExtra",
+          "zeallot", 
+          "magrittr", 
+          "DirichletReg", 
+          "Ternary", 
+          "png",
+          "ggplot2",
+          "ggpubr",
+          "ggstance", # for vertical position dodging
+          "ggtern", # for ternary plots in ggplot2
+          "ggforce", # for specific extra plotting capabilities (facet_row())
+          "plotly",
+          "gridExtra",
+          "graphics",
+          "reshape2")
+for (pkg in want) shhh(library(pkg, character.only=TRUE))
+
+# set some chunk options
+gr <- (1+sqrt(5))/2 # golden ratio, for figures
+opts_chunk$set(comment="  ",
+               fig.asp=0.9/gr,       # <--- gr used here
+               fig.align="center",
+               #echo=FALSE,
+               cache=c(TRUE, FALSE)[1], 
+               cache.path = paste0(tfn_cache,"/"),
+               fig.path = paste0(tfn_figures,"/"),
+               eval.after="fig.cap", # for dynamic captions
+               collapse=TRUE, 
+               dev="png", # svg, pdf, jpg, tiff
+               fig.width=7.0,
+               out.width="95%"
+               )
+
+## defining additional functions we might need
+
+# Kruschke's utility functions (edited by NF)
+if (c(TRUE,FALSE)[1]) source("Utilities/DBDA2E-utilities.R") 
+
+## a couple of lines we need to run every time we knit
+# setting the ggplot theme
+theme_set(theme_classic2()+
+            theme(panel.grid.major.x = element_line(colour = "grey95"),
+                  panel.grid.major.y = element_line(colour = "grey95")))
+# defining a ggplot object to remove the x axis
+no.x.axis <- theme(axis.title.x=element_blank(),
+                   axis.text.x=element_blank(),
+                   axis.ticks.x=element_blank())
+# defining a ggplot object to remove the y axis
+no.y.axis <- theme(axis.title.y=element_blank(),
+                   axis.text.y=element_blank(),
+                   axis.ticks.y=element_blank())
+
+# Loading up some functions we might need
+source("Functions/calcSDs.R") # contains functions SDmean() and SDsum()
+source("Functions/Post-Mode.R") # contains function post.mode()
+source("Functions/SplitViolin.R") # contains function geom_split_violin()
+# Also loading up some functions we've written for key modelling and simulation tasks
+# source("Functions/OMSM_Gen_Model.R")
+source("Functions/OMSM3_Gen_Model.R")
+source("Functions/Sim_Zoop.R")
+source("Functions/Sim_Zoop_RealPhe.R")
+source("Functions/OMSM_Global_Extract.R")
+source("Functions/OMSM_Zoop_Extract.R")
+```  
+
+<!-- The following commands provide a shorthand for common symbols when used in math mode. -->
+
+\newcommand{\um}{\ \mu \mathrm{ m}}
+\newcommand{\mm}{\mathrm{\ mm}}
+\newcommand{\m}{\mathrm{\ m}}
+\newcommand{\N}{\mathrm{^{15}\text{N}}}
+\newcommand{\dN}{\mathrm{\delta^{15}\text{N}}}
+\newcommand{\dNAA}{\mathrm{\delta^{15}\text{N}_\text{AA}}}
+\newcommand{\dNSAA}{\mathrm{\delta^{15}\text{N}_\text{SAA}}}
+\newcommand{\dNTAA}{\mathrm{\delta^{15}\text{N}_\text{TAA}}}
+\newcommand{\dNtr}{\mathrm{\delta^{15}\text{N}_\text{tr}}}
+\newcommand{\dNsrc}{\mathrm{\delta^{15}\text{N}_\text{src}}}
+\newcommand{\dNphe}{\mathrm{\delta^{15}N_{phe}}}
+\newcommand{\dNthr}{\mathrm{\delta^{15}N_{thr}}}
+\newcommand{\dNala}{\mathrm{\delta^{15}N_{ala}}}
+\newcommand{\dNglx}{\mathrm{\delta^{15}N_{glx}}}
+\newcommand{\dNThrPhe}{\mathrm{\delta^{15}N_{thr-phe}}}
+\newcommand{\dNAlaPhe}{\mathrm{\delta^{15}N_{ala-phe}}}
+\newcommand{\dNglxphe}{\mathrm{\delta^{15}N_{glx-phe}}}
+\newcommand{\DN}{\mathrm{\Delta^{15}\text{N}}}
+\newcommand{\DNAA}{\mathrm{\Delta^{15}\text{N}_\text{AA}}}
+\newcommand{\C}{\mathrm{^{13}\text{C}}}
+\newcommand{\dC}{\mathrm{\delta^{13}\text{C}}}
+\newcommand{\dCAA}{\mathrm{\delta^{13}\text{C}_\text{AA}}}
+\newcommand{\dCEAA}{\mathrm{\delta^{13}\text{C}_\text{EAA}}}
+\newcommand{\dCNAA}{\mathrm{\delta^{13}\text{C}_\text{NAA}}}
+\newcommand{\permil}{‰}
+\newcommand{\degree}{°}
+\newcommand{\TP}{\mathrm{TP}}
+\newcommand{\TPala}{\mathrm{TP_{ala-phe}}}
+\newcommand{\TPglx}{\mathrm{TP_{glx-phe}}}
+\newcommand{\TPts}{\mathrm{TP_{tr-src}}}
+\newcommand{\dTP}{\mathrm{\Delta TP_{ala-glx}}}
+
+# Summary {-}  
+The purpose of this notebook is to assess separation of organic matter sources in a particular setting based on a selection of tracers, and then use a Bayesian statistical model to diagnose the relative importance of those sources to a food web or higher Order consumer. To assess the models efficacy in a given environment, it should first be tested on simulated data with known ecological parameters.
+
+This notebook is composed of the following sections:
+
+  1. In the Setup section the user will define the tracers to be used, import data, and inform the notebook regarding how that data should be processed.
+  2. In the Source Separation section, multivariate analysis will be used to _visualize_ the extent to which sources of organic matter can be uniquely identified via the isotopic data supplied. Robust statistical analyses should be used to confirm that organic matter sources are distinguished with statistical significance.
+  3. In the Selecting Zooplankton Data section, zooplankton data will be imported and processed.
+  4. In the Solving Food Web Model section, the food web model will be fit and its performance assessed via simple diagnostics.
+  5. In the Visualizing Results section, model posteriors will be plotted.
+
+The model code contained herein represents the base code for our organic matter supply model as of 11/20/2024.
+
+# Setup {-}
+
+In the first few chunks, the user should enter all of the basic information that the model code will need to proceed with analysis.
+
+The first chunk identifies tracers to be included in the model and how to treat them.
+
+```{r identifying_tracers}
+################################################################################
+## IDENTIFYING SOURCE AND DESCRIPTIVE VARIABLES ##
+
+# Indicate the name of the column describing the organic matter source to which each sample belongs.
+# This column will be renamed to "Group"
+Source.Variable <- "Group"
+# Indicate the names representing each possible source of organic matter to the food web/consumer.
+# The order of this vector will describe the order these groups are referenced in figures.
+# The model can accomodate 2-6 organic matter sources, but will need to be modified to accomodate more.
+Sources <- c("Surface","Large","Small")
+# Indicate the names of all the consumer types also present in this column.
+# This could be a generic identifier like "consumer" but should not be left empty here or in the spreadsheet
+Consumers <- c("Mixed","Taxa")
+
+# List the name of any additional variables that should be stored for analysis.
+# The data in these columns must be complete for all samples.
+Descriptive.Variables <- c("Location","Epoch","Event","Size","Sizecat","Depth","Type")
+
+
+################################################################################
+## SPECIFYING TRACERS TO BE USED IN MODEL ##
+# Tracer names should match column names in the data spreadsheet
+# We'll store them in two lists
+Tracers <- list()
+SDTracers <- list()
+
+# TRACERS FOR TROPHIC EQUATIONS
+# These tracers will not be used to solve mixing equations
+# FWL: Specify the name of the tracer that will estimate the full food web length
+Tracers$FWL <- 
+  c("d15NPro")
+SDTracers$FWL <- 
+  c("SDd15NPro")
+# MTS: Specify the name of the tracer that will estimate the number of metazoan trophic steps
+Tracers$MTS <- 
+  c("d15NGlx")
+SDTracers$MTS <- 
+  c("SDd15NGlx")
+
+# TRACERS FOR MIXING EQUATIONS
+# Tracers for trophic equations must not be included in this list
+Tracers$mix <-
+  c(
+    "d15NAla",
+    "d15NAsx",
+    # "d13CLeu",
+    # "d13CIle",
+    # # "d15NPro",
+    "d15NThr",
+    # "d15NSer",
+    # "d15NGly",
+    "d15NLys",
+    "d15NPhe"
+  )
+SDTracers$mix <-
+  c(
+    "SDd15NAla",
+    "SDd15NAsx",
+    # "SDd13CLeu",
+    # "SDd13CIle",
+    # "SDd15NPro",
+    "SDd15NThr",
+    # "SDd15NSer",
+    # "SDd15NGly",
+    "SDd15NLys",
+    "SDd15NPhe"
+  )
+
+# Specify the names for all tracers with constant trophic discrimination  and their uncertainty(i.e., TDF(protozoan) = TDF(metazoan))
+Tracers$constTDF <- 
+  c(
+    "d15NAla", 
+    "d15NPro", 
+    "d15NSer", 
+    "d15NGly", 
+    "d15NLys", 
+    "d15NThr"
+  )
+SDTracers$constTDF <- 
+  c(
+    "SDd15NAla", 
+    "SDd15NPro", 
+    "SDd15NSer", 
+    "SDd15NGly", 
+    "SDd15NLys", 
+    "SDd15NThr"
+  )
+
+# Specify the names for all tracers with variable trophic discrimination  and their uncertainty(i.e., TDF(protozoan) != TDF(metazoan))
+Tracers$varTDF <- 
+  c(
+    "d15NGlx", 
+    "d15NAsx"
+  )
+SDTracers$varTDF <- 
+  c(
+    "SDd15NGlx", 
+    "SDd15NAsx"
+  )
+
+# Specify the names for all conservative tracers and their uncertainty (i.e., no trophic discrimination is expected)
+Tracers$non <- 
+  c(
+    "d15NPhe",
+    "d13CThr", 
+    "d13CVal", 
+    "d13CLeu", 
+    "d13CIle", 
+    "d13CPhe"
+  )
+SDTracers$non <- 
+  c(
+    "SDd15NPhe",
+    "SDd13CThr", 
+    "SDd13CVal", 
+    "SDd13CLeu", 
+    "SDd13CIle", 
+    "SDd13CPhe"
+  )
+
+# Is there a subset of these tracers that should be mean normalized?
+meannorm <- TRUE
+# If TRUE, which should be mean normalized?
+meannorm.which <- 
+  c(
+    "d13CThr", 
+    "d13CVal", 
+    "d13CLeu", 
+    "d13CIle"
+  )
+SDmeannorm.which <- 
+  c(
+    "SDd13CThr", 
+    "SDd13CVal", 
+    "SDd13CLeu", 
+    "SDd13CIle"
+  )
+
+################################################################################
+## Making some master lists of tracers - no changes necessary here ##
+# All tracers
+Tracers$all <- 
+  c(
+    Tracers$constTDF,
+    Tracers$varTDF,
+    Tracers$non
+  )
+SDTracers$all <- 
+  c(
+    SDTracers$constTDF,
+    SDTracers$varTDF,
+    SDTracers$non
+  )
+# Tracers that fractionate
+Tracers$frac <- 
+  c(
+    Tracers$constTDF,
+    Tracers$varTDF
+  )
+SDTracers$frac <- 
+  c(
+    SDTracers$constTDF,
+    SDTracers$varTDF
+  )
+# Ensuring that trophic tracers are not also mixing tracers
+if(sum(Tracers$mix %in% c(Tracers$FWL,Tracers$MTS)) > 0) {
+  stop("Trophic tracers should not be included in the list of mixing tracers.")
+}
+# Tracers that fractionate and will be used to fit the model
+Tracers$mixfrac <- 
+  Tracers$mix[which(Tracers$mix %in% Tracers$frac)]
+SDTracers$mixfrac <- 
+  SDTracers$mix[which(SDTracers$mix %in% SDTracers$frac)]
+# we also need to bypass all multivariate analyses if <3 tracers
+runMV <- TRUE
+if(length(Tracers$mix) < 3){
+  runMV <- FALSE
+}
+
+################################################################################
+## SPECIFYING CHOICES FOR TDF(PROTOZOAN) AND TDF(METAZOAN) ##
+# Note: default values are those used in Shea et al. (in prep)
+
+## What TDFs and SDs should be used to describe amino acid δ15N fractionation in metazoans?
+## Note that these TDFs should NOT be normalized to any source amino acid.
+TDF_meta <- data.frame("d15NAla" = 6.3, "SDd15NAla" = 2.6,
+                       "d15NGly" = 2.9, "SDd15NGly" = 3.1,
+                       "d15NThr" =-4.9, "SDd15NThr" = 3.5,
+                       "d15NSer" = 2.6, "SDd15NSer" = 3.2,
+                       "d15NVal" = 4.4, "SDd15NVal" = 2.6,
+                       "d15NLeu" = 5.6, "SDd15NLeu" = 2.4,
+                       "d15NIle" = 5.5, "SDd15NIle" = 2.4,
+                       "d15NPro" = 5.8, "SDd15NPro" = 1.7,
+                       "d15NAsx" = 5.7, "SDd15NAsx" = 1.9,
+                       "d15NMet" = 1.6, "SDd15NMet" = 2.6,
+                       "d15NGlx" = 8.0, "SDd15NGlx" = 1.7,
+                       "d15NPhe" = 0.3, "SDd15NPhe" = 0.5,
+                       "d15NTyr" = NA , "SDd15NTyr" = NA,
+                       "d15NLys" = 1.2, "SDd15NLys" = 1.2)
+
+## What TDFs and SDs should be used to describe amino acid δ15N fractionation in protozoans?
+# Note that these TDFs should NOT be normalized to any source amino acid.
+TDF_proto = data.frame("d15NAla" = 6.3, "SDd15NAla" = 2.6,
+                       "d15NGly" = 2.9, "SDd15NGly" = 3.1,
+                       "d15NThr" =-2.1, "SDd15NThr" = 1.0,
+                       "d15NSer" = 2.6, "SDd15NSer" = 3.2,
+                       "d15NVal" = 0.7, "SDd15NVal" = 1.6,
+                       "d15NLeu" = 1.4, "SDd15NLeu" = 0.6,
+                       "d15NIle" =-0.5, "SDd15NIle" = 2.7,
+                       "d15NPro" = 5.8, "SDd15NPro" = 1.7,
+                       "d15NAsx" = 0.8, "SDd15NAsx" = 1.4,
+                       "d15NMet" = NA , "SDd15NMet" = NA ,
+                       "d15NGlx" = 0.5, "SDd15NGlx" = 1.0,
+                       "d15NPhe" = 0.3, "SDd15NPhe" = 0.5,
+                       "d15NTyr" = NA , "SDd15NTyr" = NA,
+                       "d15NLys" = 1.2, "SDd15NLys" = 1.2)
+
+# Define the Order you would like tracers referenced in, if any
+Order <- c("d15NGlx", "d15NAsx", "d15NAla", "d15NIle", "d15NLeu", "d15NPro", "d15NVal", 
+           "d15NGly", "d15NSer", "d15NPhe", "d15NLys", "d15NThr", "SAA",
+           "d13CGlx", "d13CAsx", "d13CAla", "d13CIle", "d13CLeu", "d13CPro", "d13CVal", 
+           "d13CGly", "d13CSer", "d13CPhe", "d13CLys", "d13CThr", "EAA")
+SDOrder <- c("SDd15NGlx", "SDd15NAsx", "SDd15NAla", "SDd15NIle", "SDd15NLeu", "SDd15NPro", "SDd15NVal", 
+             "SDd15NGly", "SDd15NSer", "SDd15NPhe", "SDd15NLys", "SDd15NThr", "SDSAA",
+             "SDd13CGlx", "SDd13CAsx", "SDd13CAla", "SDd13CIle", "SDd13CLeu", "SDd13CPro", "SDd13CVal", 
+             "SDd13CGly", "SDd13CSer", "SDd13CPhe", "SDd13CLys", "SDd13CThr", "SDEAA")
+# If all tracers used aren't specified in the Order vector then it will be redefined
+if(length(which(Order %in% Tracers$all))<length(Tracers$all)){
+  Order <- Tracers$all
+  SDOrder <- SDTracers$all
+}
+
+```
+
+The next thing we will do is import the data. All of the data for organic matter sources and consumers should be contained in one Excel spreadsheet. Each column will be either a descriptive variable or tracer. The first row will include all variable/tracer names and each subsequent row will be a sample. The tracer data and descriptive data need to be complete for every sample included in this analysis. Any sample with an empty cell will be dropped.
+
+```{r Import_Data, eval=TRUE, fig.asp=0.6, out.width="100%"}
+
+## All data should be stored in one, single .xlsx file. 
+
+## Columns containing tracer values, uncertainties, and descriptive variables should match those defined in the chunk above.
+
+################################################################################
+## IMPORTING DATA ##
+# Define the location of .xlsx file, and sheet name if multiple sheets are  present.
+Data.all <- read_excel("Data/AA-CSIA_OSP.xlsx",
+                       sheet = "combined")[
+                         c(Source.Variable,Descriptive.Variables,Tracers$all,SDTracers$all)
+                         ]
+colnames(Data.all)[colnames(Data.all)==Source.Variable] <- "Group"
+variables <- c("Group", Descriptive.Variables)
+# Defining the preferred Order in which to reference organic matter sources
+Data.all$Group <- factor(Data.all$Group, levels = c(Sources,Consumers))
+# To define the order that specific descriptive variables should be referenced, adapt the below example.
+# Data.all["Size"] <- factor(Data.all[["Size"]], levels = c(
+#   c("0.3-1 μm", "1-5 μm", "1-6 μm", "6-51 μm", ">51 μm", "Sediment Trap",
+#   "0.2-0.5 mm", "0.5-1.0 mm", "1-2 mm", "2-5 mm", ">5 mm")
+# ))
+```
+
+Next we will mean normalize the data for a subset of tracers, based on the information given above. This is particularly useful if essential amino acid $\d13C$ values are to be included in the model. Note that the mean value of mean normalized tracers can be added as an additional tracer if that argument is made "TRUE" below.
+
+```{r mean_normalization}
+Data.all.orig <- Data.all
+# If mean normalizing some of the data
+if(meannorm == TRUE) {
+  # Calculating the mean value of those AAs in each sample
+  MN <- rowMeans(Data.all[meannorm.which])
+  SD <- c()
+  for (i in 1:nrow(Data.all)) {
+    SD <- append(SD, SDmean(Data.all.orig[i,SDmeannorm.which]))
+  }
+  # Subtracting that from the EAA δ13C values for each sample
+  # and replacing raw δ13C values in main data frame with mean normalized ones
+  Data.all[meannorm.which] <- sweep(Data.all[meannorm.which], 1, MN, "-")
+  # Can include the mean values as an additional tracer
+  include_meannorm_mean <- FALSE # make true to include mean values as separate tracer
+  if(include_meannorm_mean == TRUE){
+    Data.all$meannorm_mean <- MN
+    Data.all$SDmeannorm_mean <- SD
+    Tracers$all <- append(Tracers$all, "EAA")
+    SDTracers$all <- append(SDTracers$all, "SDEAA")
+  }
+}
+
+# we'll also need the mean values of tracers in organic matter sources later...
+# first calculating the mean tracer value for each organic matter source group
+src.mn <- 
+  aggregate(Data.all[Tracers$all], # aggregate source data
+            by=list(Group = Data.all[["Group"]]), # by organic matter source group
+            FUN = mean, na.rm=TRUE)[-1] # taking a mean
+# and the SD
+# we will calculate the standard deviation within each population
+src.SD <- 
+  aggregate(Data.all[Tracers$all], # aggregate source data
+            by=list(Group = Data.all[["Group"]]), # by organic matter source group
+            FUN = sd, na.rm=TRUE)[-1] # calculating SD within the population
+```
+
+Now we'll pull out the organic matter source data and zooplankton data as separate data frames.
+
+```{r Isolating_Sources_Zoops}
+
+################################################################################
+## ISOLATING ORGANIC MATTER SOURCE DATA ##
+Data.sources <- subset(Data.all, Type == "Particle" | Type == "Trap")
+## FILTERING DATA ##
+Data.sources$Group <- factor(NA, levels = Sources)
+Data.sources$Group[
+  which(Data.sources$Depth < 100 &
+        Data.sources$d15NLys < 0.5)
+  ] <- "Surface"
+Data.sources$Group[
+  which(Data.sources$Depth > 190 & 
+        (Data.sources$Sizecat == "Large" | Data.sources$Sizecat == "Trap"))
+  ] <- "Large"
+Data.sources$Group[
+  which(Data.sources$Depth > 190 & Data.sources$Sizecat == "Small")
+  ] <- "Small"
+Data.sources <- subset(Data.sources, !is.na(Group))
+# If a sample is missing data it will be removed in this step
+Data.sources <- na.omit(Data.sources)
+
+################################################################################
+## ISOLATING ZOOPLANKTON DATA ##
+# Now we'll grab the data on zooplankton from the master data frame.
+Data.zoops <- 
+  Data.all[
+    which(as.factor(Data.all$Group) %in% Consumers),
+  ]
+# Further subsetting data....
+Data.zoops <- 
+  subset(Data.zoops,
+         ((Depth < 100 | Depth > 200)&
+             (Type == "Zooplankton" & Event == "Night")))
+# If a sample is missing data it will be removed in this step
+Data.zoops <- na.omit(Data.zoops)
+
+```
+
+# Assessing source separation {-}
+
+First lets visualize the value of each tracer in each organic matter source.
+
+```{r Tracer_Plots_Sources, dpi=300, fig.asp=0.4, fig.width=8.5}
+Sources.long <- melt(Data.sources, id.vars=c(variables), measure.vars =c(Tracers$mix),
+                     variable.name = "Tracer", value.name = "Value")
+
+# Defining the preferred Order in which to reference tracers.
+Sources.long$Tracer <- factor(Sources.long$Tracer, levels = Order)
+
+AA_plots <-
+  ggplot(Sources.long, aes(x = Tracer, y = Value, color = Group, group=Group))+
+  geom_point(alpha=0.4, position = position_dodge(width = 0.8))+
+  labs(color="Organic Matter Source", shape="Food Web Base", fill="Zooplankton Samples")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust=1))
+AA_plots
+```
+
+Next, to visualize the between group patterns in the data we will do some multivariate analyses. We'll start by carrying out a PCA. This should give us a decent of idea of what kind of if between-group separation is a major component of variation in this data set. It will also help us visualize which tracers are driving separation between certain organic matter sources and which are providing redundant information.
+
+```{r PCA_sources, dpi=300, fig.asp=0.6, out.width="90%"}
+# Fitting PCA and adding Sample and Type as a supplemental qualitative variable
+PCA = PCA(Data.sources[c(variables,Tracers$mix)], scale.unit = FALSE, quali.sup = variables, graph = FALSE)
+
+# ## Uncomment these lines to see some diagnostics of how the PCA ran
+# # Plot component variance
+# fviz_eig(PCA, addlabels = FALSE, geom = "bar")
+# 
+# # Print a summary of the PCA results
+# summary(PCA)
+
+# Plot PC1&2 results and project variable vectors and print
+fviz_pca_biplot(PCA, axes = c(1,2), # axes tell which components to plot
+                geom = "point", addEllipses = TRUE, col.ind = Data.sources[["Group"]], col.var = 'grey50', repel=TRUE, # some display settings
+                label = c("quali", "var")) # labelling
+```
+
+We'll also try fitting an LDA to see if this is can work as a better tool to visualize our mixing space.
+
+```{r LDA_sources, dpi=300, fig.asp=0.8}
+if(runMV == TRUE){
+ntypes = nlevels(as.factor(Data.sources[["Group"]]))
+# fitting the model with leave one out cross validation
+LDA.test = lda(Group ~ . ,data = Data.sources[c("Group",Tracers$mix)], CV = TRUE,
+               prior = rep(1/ntypes, ntypes))
+
+# ## uncomment these lines to see the results of leave one out cross-validation 
+# ## and see some LDA model diagnostics
+# print model result
+# LDA.train
+
+# # create a table which compares the classification of the LDA model to the actual producer type
+# ct.prod.norm <- table(Data.sources[["Group"]], 
+#                       LDA.test$class)
+# # total percent of samples correctly classified is the sum of the diagonal of this table
+# noquote(c('% successfully categorized: ', sum(diag(prop.table(ct.prod.norm))))) #85% effective
+
+# Refitting the model using all of the available training data
+LDA.full = lda(Group ~ . ,data = Data.sources[c("Group",Tracers$mix)], CV = FALSE, prior = rep(1/ntypes, ntypes))
+
+## uncomment this line to see a summary of the full LDA
+LDA.full
+
+# store locations of training data in LD space for later plotting
+pred.train = predict(LDA.full, Data.sources[Tracers$mix])
+class.train = data.frame('Type' = Data.sources[["Group"]], pred.train$x)
+
+# Generate biplot with training data only
+plot.mix.LD12 = ggplot(data = class.train, 
+                       aes(x = LD2, y = LD1, color = Type), size = 2) + 
+  geom_point(alpha = 0.3, size=3) + 
+  stat_ellipse(type = 't', alpha = 0.6)+
+  theme(legend.position = 'none')
+if(length(Sources) > 3){
+  plot.mix.LD13 = ggplot(data = class.train, 
+                         aes(x = LD3, y = LD1, color = Type), size = 2) + 
+    geom_point(alpha = 0.3, size=3) +  
+    stat_ellipse(type = 't', alpha = 0.6)+
+    labs(color = "Training Data")
+  grid.arrange(ncol = 2, widths = c(1,1.2), plot.mix.LD12, plot.mix.LD13, top = 'LDA of Organic Matter Sources') + theme(legend.position = 'top')
+}else{
+  plot.mix.LD12
+}
+}
+```
+
+# Selecting zooplankton data {-}
+
+Let's plot out the tracer values of organic matter sources and zooplankton.
+
+```{r Tracers_Zoops.plots, dpi=300, fig.asp=0.4, fig.width=8.5}
+Zoops.long <- melt(Data.zoops, id.vars=c(variables), measure.vars =c(Tracers$mix),
+                     variable.name = "Tracer", value.name = "Value")
+
+AA_plots <-
+  ggplot(Sources.long)+
+  geom_point(aes(x = Tracer, y = Value, color = Group), alpha=0.4,
+             position = position_nudge(x = 0.1))+
+  geom_point(data = Zoops.long,
+             aes(x = Tracer, y = Value, shape = Size # add shape = /VARIABLE/ to assign shapes to different types of consumers
+             ),
+             position = position_nudge(x = -0.1))+
+  ylab("Value")+
+  labs(color="Organic Matter Source", shape="Zooplankton Samples")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust=1))
+AA_plots
+```
+
+In Order to better visualize the data we've generated in multivariate space we'll fit an LDA to the source data and then plot the zooplankton in that LD space.
+
+```{r LDA_realzoops, dpi=300, fig.asp=0.8}
+if(runMV == TRUE){
+  # poject zooplankton into LD space and predict classification
+  pred.zoops = predict(LDA.full, Data.zoops)
+  #class.zoops = data.frame('Class' = pred.zoops$class, pred.zoops$x)
+  # generate data frame which stores predicted classification of particles indexed by size and depth
+  class.zoops = data.frame('Predicted' = pred.zoops$class, pred.zoops$x, lapply(Data.zoops[,variables], as.character))
+  # Predicted probabilities of class membership
+  head(pred.zoops$posterior,n=dim(pred.zoops$posterior))
+  # linear discriminants
+  head(pred.zoops$x,n=dim(pred.zoops$x))
+  
+  # Generate biplot with Zooplankton overlayed onto training data
+  plot.mix.LD12 = ggplot(data = class.train, 
+                         aes(x = LD2, y = LD1, color = Type), size = 2) + 
+    geom_point(alpha = 0.3) + 
+    stat_ellipse(type = 't', alpha = 0.6)+
+    geom_point(data = class.zoops,
+               aes(x = LD2, y = LD1), # add shape = /VARIABLE/ to assign shapes to different types of consumers
+               color = 'black')+
+    theme(legend.position = 'none')
+  if(length(Sources) > 3){
+    plot.mix.LD13 = ggplot(data = class.train, 
+                           aes(x = LD3, y = LD1, color = Type), size = 2) + 
+      geom_point(alpha = 0.3) +  
+      stat_ellipse(type = 't', alpha = 0.6)+
+      geom_point(data = class.zoops,
+                 aes(x = LD3, y = LD1, shape = Size), # add shape = /VARIABLE/ to assign shapes to different types of consumers
+                 color = 'black')+
+      labs(shape = "Zooplankton Samples") + labs(color = "Organic Matter Sources")
+    grid.arrange(ncol = 2, widths = c(1,1.6), plot.mix.LD12, plot.mix.LD13, top = 'LDA of Organic Matter Sources') + theme(legend.position = 'top')
+  }else{
+    plot.mix.LD12
+  }
+}
+```
+
+Okay! So we've got our tracer data for organic matter sources imported, we've got our zooplankton imported. We've visualized the relationships between source groups, and our zooplankton.
+
+# Solving food web model using MCMC {-}
+Next, we will use Markov Chain Monte Carlo to find PDFs describing the most likely solutions to our mixing problem. First we will write a BUGS model, then use JAGS to do the MCMC.
+
+## Setting up for MCMC {-}
+
+Organizing the input data for MCMC.
+```{r datalist, eval=TRUE}
+
+N_T <- length(Tracers$all) # number of tracers
+N_S <- length(Sources) # number of organic matter sources
+N_Z <- nrow(Data.zoops) # number of zooplankton samples
+sd.anl <- 0.52
+sdTDF_scaling_factor <- 1
+sdY_scaling_factor <- 2
+
+Data.1 <- list(
+  ## How many tracers will be used in this model?
+  N_T = N_T,
+  ## How many zooplankton samples are there?
+  N_Z = N_Z,
+  ## Where should the model look for zooplankton amino acid isotope data?
+  Y   = as.matrix(Data.zoops[Tracers$all]),
+  ## and the analytical uncertainty in those measurements
+  sd_Y = as.matrix(Data.zoops[SDTracers$all])*sdY_scaling_factor,
+  ## Which tracers will be used in the FWL equation and not see the data?
+  i_T_FWL = which(Tracers$all %in% Tracers$FWL),
+  ## Which tracers will be used in the MTS equation and not see the data?
+  i_T_MTS = which(Tracers$all %in% Tracers$MTS),
+  ## Which tracers will be used in the mixing model and see the data?
+  i_T_mix = which(Tracers$all %in% Tracers$mix),
+  ## Which tracers do not fractionate?
+  i_T_non = which(Tracers$all %in% Tracers$non),
+  ## Which tracers do fractionate?
+  i_T_frac = which(Tracers$all %in% Tracers$frac),
+  ## Which tracers have constant TDFs throughout the food web?
+  i_T_const = which(Tracers$all %in% Tracers$constTDF),
+  ## Which tracers have variable TDFs throughout the food web?
+  i_T_var = which(Tracers$all %in% Tracers$varTDF),
+  ## Where should the model look for TDF data and its associated uncertainty?
+  # for metazoan TDFs
+  TDF_m   = as.numeric(TDF_meta[Tracers$frac]),
+  sdTDF_m = as.numeric(TDF_meta[SDTracers$frac])*sdTDF_scaling_factor,
+  # for protozoan TDFs
+  TDF_p   = as.numeric(TDF_proto[Tracers$frac]),
+  sdTDF_p = as.numeric(TDF_proto[SDTracers$frac])*sdTDF_scaling_factor
+  )
+
+## Where should the model look for organic matter source data?
+## making generalized names A-F for a max of six possible organic matter sources
+Sources.alpha <- c("X_A","X_B","X_C","X_D","X_E","X_F")
+SDSources.alpha <- c("sdX_A","sdX_B","sdX_C","sdX_D","sdX_E","sdX_F")
+nsams_alpha   <- c("N_A","N_B","N_C","N_D","N_E","N_F")
+## Loop through all sources described in setup chunks above to add that data
+## to the Data.1 list as individual matrices for each source
+for (i in 1:N_S) {
+  sams_source <- Data.sources[Data.sources[["Group"]]==Sources[i],c(Tracers$all,SDTracers$all)]
+  Data.1[[Sources.alpha[i]]] = as.matrix(sams_source[Tracers$all])
+  Data.1[[SDSources.alpha[i]]] = as.double(colMeans(sams_source[SDTracers$all]))
+  Data.1[[nsams_alpha[i]]]   = sum((Data.sources[["Group"]]==Sources[i])*1)
+}
+# Setting i_T_ vectors =0 if no tracers in that ccategory were included
+if(length(Data.1$i_T_non)==0){
+  Data.1$i_T_non <- 0
+}
+if(length(Data.1$i_T_frac)==0){
+  Data.1$i_T_frac <- 0
+}
+if(length(Data.1$i_T_const)==0){
+  Data.1$i_T_const <- 0
+}
+if(length(Data.1$i_T_var)==0){
+  Data.1$i_T_var <- 0
+}
+```
+and defining our initial values.
+```{r initlist, eval=TRUE}
+set.seed(666) # Set seed for repeatability
+Nchains <- 3 # Number of parallel Markov Chains to run
+inits_1 <- vector(mode="list", length=Nchains) # initial values
+means_alpha <- c("mean_A","mean_B","mean_C","mean_D","mean_E","mean_F") # names for organic matter sources
+sd_alpha <- c("sd_A","sd_B","sd_C","sd_D","sd_E","sd_F") # and their uncertainty
+# This function will generate starting values for each chain and save them as a list
+fun_init_1 <- function(i) {
+  inits <- 
+    list(
+      # We will basically start TDFs nea their expected value
+      # TDF_meta = runif(length(TDF_meta[Tracers$frac]),
+      #                  as.double(TDF_meta[Tracers$frac]-TDF_meta[SDTracers$frac]),
+      #                  as.double(TDF_meta[Tracers$frac]+TDF_meta[SDTracers$frac])),
+      # TDF_proto = runif(length(TDF_proto[Tracers$frac]), 
+      #                   as.double(TDF_proto[Tracers$frac]-TDF_proto[SDTracers$frac]), 
+      #                   as.double(TDF_proto[Tracers$frac]+TDF_proto[SDTracers$frac])),
+      pz        = rdirichlet(n=N_Z, rep(1, N_S)), # mixing coefficients can take any starting composition
+      FWL = runif(n=N_Z, 0,5),
+      MTS = runif(n=N_Z, 0,5),
+      # sdPTS    = rtgamma(n=N_Z, 0.001, 0.001, 10^-50), # SDPTS gets an inverse gamma
+      # sdMTS = rtgamma(n=N_Z, 0.001, 0.001, 10^-50), # SDMTS get and inverse gamma
+      # sdFWL = rtgamma(n=N_Z, 0.001, 0.001, 10^-50), # SDFWL get and inverse gamma
+      .RNG.seed = i+1,
+      .RNG.name = c("base::Super-Duper", 
+                    "base::Wichmann-Hill",
+                    "base::Marsaglia-Multicarry")[i %% 3 + 1]
+    )
+  # We define starting values for sources in a separate loop so we can be flexible with the number of sources included in the model
+  for (j in 1:N_S) {
+    inits[[means_alpha[j]]] = runif(N_T, 0, 20)
+    inits[[sd_alpha[j]]] = runif(N_T, 0, 2)
+  }
+  return(inits)
+}
+for (i in 1:Nchains) inits_1[[i]] <- fun_init_1(i)
+```
+
+## Drafting a BUGS model {-}
+Now we'll define our BUGS model.
+
+```{r OMSM}
+if(Data.1$i_T_non[1]==0){Tracers_NoFrac <- FALSE}else{Tracers_NoFrac <- TRUE}
+if(Data.1$i_T_const[1]==0){Tracers_ConstFrac <- FALSE}else{Tracers_ConstFrac <- TRUE}
+if(Data.1$i_T_var[1]==0){Tracers_VarFrac <- FALSE}else{Tracers_VarFrac <- TRUE}
+
+OMSM <- OMSM_Gen_Model(
+  N_S = N_S, 
+  Tracers_NoFrac = TRUE,
+  Tracers_ConstFrac = TRUE,
+  Tracers_VarFrac = TRUE
+)
+```
+
+## Running MCMC in JAGS {-}
+Now we can run the MCMC!
+
+```{r runjags, eval=TRUE}
+
+samsPerChain <- 10000 # needed  below for narrative, so we give it a name.
+monitor_vars = c("mean_A", "sd_A",
+                 "mean_B", "sd_B",
+                 "mean_C", "sd_C",
+                 # "mean_D", "sd_D",
+                 "mean_b", "mean_z",
+                 "TDF_meta", "sdTDF_m",
+                 "TDF_proto","sdTDF_p",
+                 "pz"       , "FWL"  , "PTS", "MTS")
+
+rjo_1 <- # S3 object of class "runjags"
+  run.jags(model = OMSM,
+           data = Data.1,
+           inits = inits_1,
+           silent.jags = FALSE,
+           n.chains = Nchains,
+           adapt  = 10000,
+           burnin = 40000,
+           thin = 6,
+           sample = samsPerChain,
+           method = "parallel",
+           modules = "glm",
+           monitor = monitor_vars
+          )
+```
+
+## Diagnostics {-} 
+Here we run some diagnostics. Initially we use John K. Kruschke's function `diagMCMC` to check out model parameters and make sure things are running properly. When these diagnostics look good, we set `eval=FALSE` in the chunk header and made a nicer parameter plot comparing known parameter values and the MCMC posteriors for those parameters, which is seen below.
+
+```{r diagMu, eval=TRUE, fig.cap="Means of tracers 1 and 2 for prey types A,B,C."}
+## Kruschke's utility functions (edited by NF)
+# edit "parname" to print additional parameter diagnostics as desired
+# numbers in hard brackets pertain to samples and tracers
+if (c(TRUE,FALSE)[1]) source("Utilities/DBDA2E-utilities.R") 
+diagMCMC(rjo_1$mcmc, parName="FWL[1]")
+diagMCMC(rjo_1$mcmc, parName="MTS[1]")
+diagMCMC(rjo_1$mcmc, parName="PTS[1]")
+diagMCMC(rjo_1$mcmc, parName="pz[1,1]")
+diagMCMC(rjo_1$mcmc, parName="pz[1,2]")
+diagMCMC(rjo_1$mcmc, parName="pz[1,3]")
+# diagMCMC(rjo_1$mcmc, parName="pz[1,4]")
+diagMCMC(rjo_1$mcmc, parName="mean_z[1,1]")
+diagMCMC(rjo_1$mcmc, parName="mean_z[1,9]")
+
+```  
+
+# Visualizing Results {-}
+Now let's generate some data structures to store the MCMC output and other relevant data from generating plots and figures. There are a few different data types we need to get out of the MCMC output
+
+  1. Global model parameter posteriors (TDFs, d15N(sources))
+  2. Zooplankton food web parameter posteriors (mixing coefficients, trophic positions, and d15N values at the base of the food web)
+
+We'll look at these one at a time.
+
+## MCMC global parameter posteriors {-}
+
+```{r MCMC_global_param_extraction, message=FALSE}
+
+OMSM_Global_Extract(
+    rjo_1 = rjo_1,
+    Sources = Sources,
+    Data.zoops = Data.zoops,
+    Tracers.all = Tracers$all,
+    Tracers.frac = Tracers$frac,
+    Tracers.varTDF = Tracers$varTDF
+)
+```
+
+Let's generate plots of the MCMC posteriors for global model parameters. Mainly here we're interested in making sure that the mean $\dNAA$ and $\dCAA$ values that the model used in mixing models agree well with the data, and looking to see what the model selected for $\DNAA$ values.
+
+```{r global_posterior_comparisons, dpi=500, fig.asp=0.4, fig.width=8.5}
+## plotting posterior δ15N values for organic matter sources compared to data
+plot_source <- 
+  ggplot()+
+  geom_density(data = posts.global.long$mean_Sources$samples[
+    which(posts.global.long$mean_Sources$samples$Tracer %in% Tracers$mix),],
+               aes(x=Value, fill=Group), alpha=0.8, color="grey10", size=0.5)+
+  geom_point(data=Sources.long[
+    which(Sources.long$Tracer %in% Tracers$mix),],
+             aes(x=Value, y=0, fill=Group, shape = "Source Data"),
+             color="grey10",size=2,stroke=0.75,
+             show.legend = FALSE)+
+  scale_shape_manual(values=c(24))+
+  xlab("Value")+
+  facet_wrap(~Tracer, scales = "free", nrow=2)+
+  scale_x_continuous(n.breaks=4)+
+  labs(fill="Organic Matter Source",color="95% HDI")+
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+        axis.title.y = element_blank(),plot.title = element_text(hjust = 0.5),
+        legend.position="bottom")
+plot_source
+```
+
+
+
+## MCMC zooplankton parameter posteriors {-}
+
+```{r MCMC_zoop_param_extract}
+
+OMSM_Zoop_Extract(
+    rjo_1 = rjo_1,
+    Sources = Sources,
+    Data.zoops = Data.zoops,
+    Tracers.all = Tracers$all,
+    Tracers.frac = Tracers$frac,
+    Tracers.varTDF = Tracers$varTDF
+)
+```
+
+Now let's generate plots of the MCMC posteriors for the zooplankton sample-specific parameters. We'll want to plot the model posteriors for the tracer values at the base of the food web. We'll do this for all the individual tracers, but also try and visualize the multivariate patterns using LDA.Note that all tracers are plotted here, including those that were not used to fit the model, though those are not included in LDAs.
+
+```{r posterior_base, dpi=300, fig.asp=0.6, fig.width=8.5}
+
+## Generating AA δ15N comparison plot
+posts.zoops.long$base$thin$Group <- as.factor(posts.zoops.long$base$thin$Group)
+  
+AAplots <-
+  ggplot(Sources.long[which(Sources.long$Tracer %in% Tracers$mix),])+
+  geom_point(aes(x = Tracer, y = Value, color = Group),
+             position = position_nudge(x = 0.2))+
+  geom_point(data = Zoops.long[which(Zoops.long$Tracer %in% Tracers$mix),],
+             aes(x = Tracer, y = Value, shape = Size # add shape = /VARIABLE/ to assign shapes to different types of consumers
+             ),
+             position = position_nudge(x = -0.2))+
+  geom_point(data = posts.zoops.long$base$thin[which(posts.zoops.long$base$thin$Tracer %in% Tracers$mix),],
+             aes(x = Tracer, y = Value), color = "grey60", alpha=0.1, pch=16,
+             position = position_dodge2(width=0.1))+
+  geom_point(data = posts.zoops.long$base$mean[which(posts.zoops.long$base$mean$Tracer %in% Tracers$mix),],
+             aes(x = Tracer, y = Value, fill="posterior mean"), color = "brown", alpha=1,
+             position = position_dodge2(width = 0.1))+
+  ylab("Value")+
+  labs(color="Organic Matter Source", shape="Consumer Samples", fill="Food Web Base Posterior")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust=1))
+AAplots
+
+## Generating LDA comparison plot
+if(runMV == TRUE){
+# poject zooplankton into LD space and predict classification
+pred.base.MCMC = predict(LDA.full, 
+                         posts.zoops$base$mode)
+#class.zoops = data.frame('Class' = pred.zoops$class, pred.zoops$x)
+# generate data frame which stores predicted classification of particles indexed by size and depth
+class.base.MCMC = data.frame('Predicted' = pred.base.MCMC$class, pred.base.MCMC$x,
+                             lapply(posts.zoops$base$mean[variables],as.character))
+# # Predicted probabilities of class membership
+# head(pred.base.MCMC$posterior,n=dim(pred.base.MCMC$posterior))
+# # linear discriminants
+# head(pred.base.MCMC$x,n=dim(pred.base.MCMC$x))
+
+pred.base.sams <- predict(LDA.full,
+                          posts.zoops$base$thin[Tracers$mix])
+# generate data frame which stores predicted classification of particles indexed by size and depth
+class.base.sams = data.frame('Predicted' = pred.base.sams$class, pred.base.sams$x,
+                             lapply(posts.zoops$base$thin[variables],as.character))
+# Predicted probabilities of class membership
+# head(pred.base.sams$posterior,n=dim(pred.base.sams$posterior))
+# linear discriminants
+# head(pred.base.sams$x,n=dim(pred.base.sams$x))
+
+ggplot(data = class.train, 
+                       aes(x = LD2, y = LD1), size = 2) + 
+  geom_point(aes(shape=Type), alpha = 1, color="grey20") +
+  stat_ellipse(aes(group=Type),type = 't', alpha = 0.8)+
+  stat_ellipse(data = class.base.sams,
+             aes(x = LD2, y = LD1, fill = interaction(Size, Depth)# add "fill = interaction(variable1, variable2, ...)" to draw 95% confidence ellipses for each individual sample
+                 ),
+             type = 't', alpha = 0.3, size=0.5, geom = "polygon")+
+  geom_point(data = class.base.MCMC,
+             aes(x = LD2, y = LD1, fill = interaction(Size, Depth) # add "fill = interaction(variable1, variable2, ...)" to fill diamonds for each individual sample
+                 ),
+             size=3.5, shape=23, stroke=1)+
+  labs(fill = "Posterior 95% HDI and Mode",
+       color = "Consumer Sample",
+       shape = "Organic Matter Source"
+       )+
+  guides(color=FALSE, fill=guide_legend(ncol = 2))
+}
+```
+
+We also want to look at the mean_z parameter for each zooplankton sample to see if and where the posteriors are deviating from the data.
+
+```{r posterior_zoop, dpi=300, fig.asp=0.6, fig.width=8.5}
+
+## Generating AA δ15N comparison plot
+posts.zoops.long$zoop$thin$Group <- as.factor(posts.zoops.long$zoop$thin$Group)
+  
+AAplots <-
+  ggplot(Sources.long[which(Sources.long$Tracer %in% Tracers$mix),])+
+  geom_point(aes(x = Tracer, y = Value, color = Group),
+             position = position_nudge(x = 0.2))+
+  geom_point(data = Zoops.long[which(Zoops.long$Tracer %in% Tracers$mix),],
+             aes(x = Tracer, y = Value, shape=Size # add shape = /VARIABLE/ to assign shapes to different types of consumers
+                 ),
+             position = position_nudge(x = -0.2))+
+  geom_point(data = posts.zoops.long$zoop$thin[which(posts.zoops.long$zoop$thin$Tracer %in% Tracers$mix),],
+             aes(x = Tracer, y = Value), color = "grey60", alpha=0.1, pch=16,
+             position = position_dodge2(width=0.1))+
+  geom_point(data = posts.zoops.long$zoop$mean[which(posts.zoops.long$zoop$mean$Tracer %in% Tracers$mix),],
+             aes(x = Tracer, y = Value, fill="posterior mean"), color = "brown", alpha=1,
+             position = position_dodge2(width = 0.1))+
+  ylab(expression(delta^{15}*N*" (\u2030)"))+
+  labs(color="Organic Matter Source", shape="Consumer Samples", fill="Consumer Posterior")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust=1))
+AAplots
+
+```
+
+We also want to plot up the model posteriors for trophic parameters. The below examples plot posteriors across depth for various sizes of zooplankton. Adjust plots based on your data.
+
+```{r posterior_trophic, dpi=300, fig.asp=0.6, fig.width=8.5}
+
+#### Food Web Length ####
+plot.FWL <-
+  ggplot()+
+  geom_line(data = posts.zoops$trophic$HDI95,
+            aes(x = FWL, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.5, size = 1,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$trophic$HDI90,
+            aes(x = FWL, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.7, size = 1.5,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$trophic$HDI75,
+            aes(x = FWL, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.9, size = 2,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$trophic$HDI50,
+            aes(x = FWL, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 1, size = 3,
+            position = position_dodgev(height = 80))+
+  geom_point(data = posts.zoops$trophic$mode,
+             aes(x = FWL, y = Depth, group = interaction(Depth, Size), fill = Size),
+             size = 3, shape = 22,
+             position = position_dodgev(height = 80))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,1,2,3,4,5,6,7,8,9,10))+
+  coord_cartesian(xlim = c(0,NA))
+#### Metazoan Trophic Steps ####
+plot.MTS <-
+  ggplot()+
+  geom_line(data = posts.zoops$trophic$HDI95,
+            aes(x = MTS, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.5, size = 1,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$trophic$HDI90,
+            aes(x = MTS, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.7, size = 1.5,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$trophic$HDI75,
+            aes(x = MTS, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.9, size = 2,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$trophic$HDI50,
+            aes(x = MTS, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 1, size = 3,
+            position = position_dodgev(height = 80))+
+  geom_point(data = posts.zoops$trophic$mode,
+             aes(x = MTS, y = Depth, group = interaction(Depth, Size), fill = Size),
+             size = 3, shape = 22,
+             position = position_dodgev(height = 80))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,1,2,3,4,5,6,7,8,9,10))+
+  coord_cartesian(xlim = c(0,NA))
+#### Protozoan Trophic Steps ####
+plot.PTS <-
+  ggplot()+
+  geom_line(data = posts.zoops$trophic$HDI95,
+            aes(x = PTS, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.5, size = 1,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$trophic$HDI90,
+            aes(x = PTS, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.7, size = 1.5,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$trophic$HDI75,
+            aes(x = PTS, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.9, size = 2,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$trophic$HDI50,
+            aes(x = PTS, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 1, size = 3,
+            position = position_dodgev(height = 80))+
+  geom_point(data = posts.zoops$trophic$mode,
+             aes(x = PTS, y = Depth, group = interaction(Depth, Size), fill = Size),
+             size = 3, shape = 22,
+             position = position_dodgev(height = 80))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,1,2,3,4,5,6,7,8,9,10))+
+  coord_cartesian(xlim = c(0,NA))
+
+ggarrange(plot.FWL,
+          plot.MTS+no.y.axis,
+          plot.PTS+no.y.axis,
+          nrow=1, widths = c(1.2,1,1), common.legend = TRUE, legend="top")
+
+```
+
+Last we'll do the same for mixing parameters.
+
+```{r posterior_f_ternary, eval=FALSE, dpi=300, fig.asp=0.82, fig.width=8.5}
+
+## Making ternary plots of mixing parameters
+
+posts.zoops$f$samples$model <- "vague prior"
+
+ggtern(data = posts.zoops$f$samples,
+       aes(x=Surface,
+           y=LargeSmall,
+           z=Submicron))+
+  stat_confidence_tern(aes(fill=model), color="grey20", alpha=0.4, size=0,
+                       breaks=c(0.95,0.90,0.75,0.50), geom = "polygon")+
+  scale_fill_manual(values=c("steelblue1","steelblue4"))+
+  geom_point(data = posts.zoops$f$mode,
+             aes(x=Surface, y=LargeSmall, z=Submicron),
+             size = 3, shape = 24, fill="steelblue1")+
+  theme_bw()+
+  theme(legend.box="vertical",
+        legend.position = "right",
+        tern.axis.title.T=element_blank(),
+        tern.axis.title.L=element_blank(),
+        tern.axis.title.R=element_blank())+
+  theme_arrowlarge()+
+  scale_shape_manual(values = c(24))+
+  labs(fill="Model Posterior",shape="True Value",color="95% HDI")+
+  facet_grid(rows = vars(Depth), cols = vars(Size))
+
+ggtern(data = posts.zoops$f$samples,
+       aes(x=SurfLarge,
+           y=Small,
+           z=Submicron))+
+  stat_confidence_tern(aes(fill=model), color="grey20", alpha=0.4, size=0,
+                       breaks=c(0.95,0.90,0.75,0.50), geom = "polygon")+
+  scale_fill_manual(values=c("steelblue1","steelblue4"))+
+  geom_point(data = posts.zoops$f$mode,
+             aes(x=SurfLarge, y=Small, z=Submicron),
+             size = 3, shape = 24, fill="steelblue1")+
+  theme_bw()+
+  theme(legend.box="vertical",
+        legend.position = "right",
+        tern.axis.title.T=element_blank(),
+        tern.axis.title.L=element_blank(),
+        tern.axis.title.R=element_blank())+
+  theme_arrowlarge()+
+  scale_shape_manual(values = c(24))+
+  labs(fill="Model Posterior",shape="True Value",color="95% HDI")+
+  facet_grid(rows = vars(Depth), cols = vars(Size))
+
+ggtern(data = posts.zoops$f$samples,
+       aes(x=Surface,
+           y=Large,
+           z=SmallSub))+
+  stat_confidence_tern(aes(fill=model), color="grey20", alpha=0.4, size=0,
+                       breaks=c(0.95,0.90,0.75,0.50), geom = "polygon")+
+  scale_fill_manual(values=c("steelblue1","steelblue4"))+
+  geom_point(data = posts.zoops$f$mode,
+             aes(x=Surface, y=Large, z=SmallSub),
+             size = 3, shape = 24, fill="steelblue1")+
+  theme_bw()+
+  theme(legend.box="vertical",
+        legend.position = "right",
+        tern.axis.title.T=element_blank(),
+        tern.axis.title.L=element_blank(),
+        tern.axis.title.R=element_blank())+
+  theme_arrowlarge()+
+  scale_shape_manual(values = c(24))+
+  labs(fill="Model Posterior",shape="True Value",color="95% HDI")+
+  facet_grid(rows = vars(Depth), cols = vars(Size))
+
+
+```
+
+```{r posterior_f_depth_profiles, eval=TRUE, dpi=300, fig.asp=0.5, fig.width=8.5}
+#### f(Surface) ####
+plot.Surface <-
+  ggplot()+
+  geom_line(data = posts.zoops$f$HDI95,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.5, size = 1,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$f$HDI90,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.7, size = 1.5,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$f$HDI75,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.9, size = 2,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$f$HDI50,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 1, size = 3,
+            position = position_dodgev(height = 80))+
+  geom_point(data = posts.zoops$f$mode,
+             aes(x = Surface, y = Depth, group = interaction(Depth, Size), fill = Size),
+             size = 3, shape = 22,
+             position = position_dodgev(height = 80))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,0.50,1))+
+  labs(color="Zooplankton",fill="Zooplankton")+
+  coord_cartesian(xlim = c(0,1))
+#### f(Large) ####
+plot.Large <-
+  ggplot()+
+  geom_line(data = posts.zoops$f$HDI95,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.5, size = 1,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$f$HDI90,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.7, size = 1.5,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$f$HDI75,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.9, size = 2,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$f$HDI50,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 1, size = 3,
+            position = position_dodgev(height = 80))+
+  geom_point(data = posts.zoops$f$mode,
+             aes(x = Large, y = Depth, group = interaction(Depth, Size), fill = Size),
+             size = 3, shape = 22,
+             position = position_dodgev(height = 80))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,0.50,1))+
+  labs(color="Zooplankton",fill="Zooplankton")+
+  coord_cartesian(xlim = c(0,1))
+#### f(Small) ####
+plot.Small <-
+  ggplot()+
+  geom_line(data = posts.zoops$f$HDI95,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.5, size = 1,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$f$HDI90,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.7, size = 1.5,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$f$HDI75,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 0.9, size = 2,
+            position = position_dodgev(height = 80))+
+  geom_line(data = posts.zoops$f$HDI50,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = Size),
+            alpha = 1, size = 3,
+            position = position_dodgev(height = 80))+
+  geom_point(data = posts.zoops$f$mode,
+             aes(x = Small, y = Depth, group = interaction(Depth, Size), fill = Size),
+             size = 3, shape = 22,
+             position = position_dodgev(height = 80))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,0.50,1))+
+  labs(color="Zooplankton",fill="Zooplankton")+
+  coord_cartesian(xlim = c(0,1))
+# #### f(Submicron) ####
+# plot.Submicron <-
+#   ggplot()+
+#   geom_line(data = posts.zoops$f$HDI95,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = Size),
+#             alpha = 0.5, size = 1,
+#             position = position_dodgev(height = 80))+
+#   geom_line(data = posts.zoops$f$HDI90,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = Size),
+#             alpha = 0.7, size = 1.5,
+#             position = position_dodgev(height = 80))+
+#   geom_line(data = posts.zoops$f$HDI75,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = Size),
+#             alpha = 0.9, size = 2,
+#             position = position_dodgev(height = 80))+
+#   geom_line(data = posts.zoops$f$HDI50,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = Size),
+#             alpha = 1, size = 3,
+#             position = position_dodgev(height = 80))+
+#   geom_point(data = posts.zoops$f$mode,
+#              aes(x = Submicron, y = Depth, group = interaction(Depth, Size), fill = Size),
+#              size = 3, shape = 22,
+#              position = position_dodgev(height = 80))+
+#   scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+#   scale_x_continuous(breaks = c(0,0.50,1))+
+#   labs(color="Zooplankton",fill="Zooplankton")+
+#   coord_cartesian(xlim = c(0,1))
+# #### f(Small+Sub) ####
+# plot.SmallSub <-
+#   ggplot()+
+#   geom_line(data = posts.zoops$f$HDI95,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = Size),
+#             alpha = 0.5, size = 1,
+#             position = position_dodgev(height = 80))+
+#   geom_line(data = posts.zoops$f$HDI90,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = Size),
+#             alpha = 0.7, size = 1.5,
+#             position = position_dodgev(height = 80))+
+#   geom_line(data = posts.zoops$f$HDI75,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = Size),
+#             alpha = 0.9, size = 2,
+#             position = position_dodgev(height = 80))+
+#   geom_line(data = posts.zoops$f$HDI50,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = Size),
+#             alpha = 1, size = 3,
+#             position = position_dodgev(height = 80))+
+#   geom_point(data = posts.zoops$f$mode,
+#              aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), fill = Size),
+#              size = 3, shape = 22,
+#              position = position_dodgev(height = 80))+
+#   scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+#   scale_x_continuous(breaks = c(0,0.50,1))+ xlab("Small + Submicron")+
+#   labs(color="Zooplankton",fill="Zooplankton")+
+#   coord_cartesian(xlim = c(0,1))
+
+
+ggarrange(plot.Surface,
+          plot.Large + no.y.axis,
+          plot.Small + no.y.axis,
+          # plot.Submicron + no.y.axis,
+          nrow=1, ncol=3, widths = c(1.1,1,1), common.legend = TRUE, legend="top")
+
+# ggarrange(plot.Surface,
+#           plot.Large + no.y.axis,
+#           plot.SmallSub + no.y.axis,
+#           nrow=1, ncol=3, widths = c(1.18,1,1), common.legend = TRUE, legend="right")
+
+```
+
+```{r posterior_f_colplots, eval=FALSE, dpi=300, fig.asp=0.5, fig.width=8.5}
+#### 0.2-0.5 mm zooplankton ####
+plot.p2p5 <-
+  ggplot()+
+  geom_col(data = subset(posts.zoops.long$f$mean, Size=="0.2-0.5 mm"),
+           aes(y=f, x=Depth, fill = Source),
+           position = position_fill(), width = 80)+
+  scale_x_reverse(breaks = c(0,200,300,400,500,750,1000), limits = c(1000,0)) + ylab("0.2-0.5 mm") +
+  scale_y_continuous(breaks = c(0,0.50,1), limits = c(0,NA))+
+  coord_flip()
+plot.12 <-
+  ggplot()+
+  geom_col(data = subset(posts.zoops.long$f$mean, Size=="1-2 mm"),
+           aes(y=f, x=Depth, fill = Source),
+           position = position_fill(), width = 80)+
+  scale_x_reverse(breaks = c(0,200,300,400,500,750,1000), limits = c(1000,0)) + ylab("1-2 mm") +
+  scale_y_continuous(breaks = c(0,0.50,1), limits = c(0,NA))+
+  coord_flip()
+plot.25 <-
+  ggplot()+
+  geom_col(data = subset(posts.zoops.long$f$mean, Size=="2-5 mm"),
+           aes(y=f, x=Depth, fill = Source),
+           position = position_fill(), width = 80)+
+  scale_x_reverse(breaks = c(0,200,300,400,500,750,1000), limits = c(1000,0)) + ylab("2-5 mm") +
+  scale_y_continuous(breaks = c(0,0.50,1), limits = c(0,NA))+
+  coord_flip()
+plot.5 <-
+  ggplot()+
+  geom_col(data = subset(posts.zoops.long$f$mean, Size==">5 mm"),
+           aes(y=f, x=Depth, fill = Source),
+           position = position_fill(), width = 80)+
+  scale_x_reverse(breaks = c(0,200,300,400,500,750,1000), limits = c(1000,0)) + ylab(">5 mm") +
+  scale_y_continuous(breaks = c(0,0.50,1), limits = c(0,NA))+
+  coord_flip()
+
+
+ggarrange(plot.p2p5,
+          plot.12 + no.y.axis,
+          plot.25 + no.y.axis,
+          plot.5 + no.y.axis,
+          nrow=1, ncol=4, widths = c(1.25,1,1,1), common.legend = TRUE, legend="top")
+
+```
+
+```{r f-vs-TP, fig.width=8, fig.asp=0.6, dpi=300}
+
+ggplot() +
+  geom_point(aes(y = posts.zoops$f$thin$Surface, x = posts.zoops$trophic$thin$MTS,
+                 color = posts.zoops$f$thin$Size),
+             shape=1, alpha=0.5, size=0.5)+
+  geom_point(aes(y = posts.zoops$f$mode$Surface, x = posts.zoops$trophic$mode$MTS,
+                 fill = posts.zoops$f$mode$Size),
+             shape=21, size=2)+
+  theme(legend.position = "bottom")
+  
+f_surface <- posts.zoops$f$mode$Surface
+MTS <- posts.zoops$trophic$mode$MTS
+Size <- posts.zoops$trophic$mode$Size
+model <- lm(f_surface ~ MTS + Size)
+plot(allEffects(mod=model))
+anova(model)
+```
+
+The last things we want to do here is export out mixing model results to a viewable table and a .xlsx file.
+
+```{r export-results, eval=TRUE}
+save(posts.global, posts.global.long, 
+     posts.zoops, posts.zoops.long, 
+     Data.all,
+     file = "OMSM_posteriors.RData")
+```
+
+
+

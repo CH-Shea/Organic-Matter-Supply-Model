@@ -1,0 +1,1043 @@
+---
+title: "AA-CSIA-based Food Web Model: Analyzing data from wild zooplankton"
+author: "Connor Shea"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  #html_document: 
+  bookdown::html_document2:  
+    self-contained: yes
+    theme: cerulean #paper #cosmo #journal #readable
+    toc: true
+    smooth_scroll: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    fig_caption: yes
+    code_folding: hide
+bibliography: Utilities/MesoPelaZooAA.bib
+csl: Utilities/LnO.csl
+link-citations: yes
+---
+
+```{r setup, echo=FALSE, warning=FALSE}
+# This chunk sets up a working directory, loads packages, and sets global chunk
+# options for the .Rmd document
+
+rm(list=ls()) # clean up
+
+## set working directory to the same folder that contains this .rmd file
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+## load packages quietly
+shhh <- suppressPackageStartupMessages # It's a library, so shhh!
+want <- c("knitr", 
+          "readxl", # for reading xl files
+          "MASS", # some statistics including lda
+          "vegan", # ecology statistics
+          "FactoMineR", # includes PCA function and utilities
+          "factoextra", # extra utilities for FactoMineR
+          "runjags", # To run Bayesian models
+          "TruncatedDistributions", # To generate truncate porbability distributions
+          "coda",  
+          "DT", # makes nice sortable tables
+          "openxlsx", # writes to .xlsx files
+          "compositions", 
+          "kableExtra",
+          "zeallot", 
+          "magrittr", 
+          "DirichletReg", 
+          "Ternary", 
+          "png",
+          "ggplot2",
+          "ggpubr",
+          "ggstance", # for vertical position dodging
+          "ggtern", # for ternary plots in ggplot2
+          "ggforce", # for specific extra plotting capabilities (facet_row())
+          "plotly",
+          "gridExtra",
+          "graphics",
+          "reshape2")
+for (pkg in want) shhh(library(pkg, character.only=TRUE))
+
+## set some chunk options
+gr <- (1+sqrt(5))/2 # golden ratio, for figures
+opts_chunk$set(comment="  ",
+               fig.asp=0.9/gr,       # <--- gr used here
+               fig.align="center",
+               #echo=FALSE,
+               cache=c(TRUE, FALSE)[1], 
+               eval.after="fig.cap", # for dynamic captions
+               collapse=TRUE, 
+               dev="png", # svg, pdf, jpg, tiff
+               fig.width=7.0,
+               out.width="95%"
+               )
+
+## Kruschke's utility functions (edited by NF)
+if (c(TRUE,FALSE)[1]) source("Utilities/DBDA2E-utilities.R") 
+
+## a couple of lines we need to run every time we knit
+# setting the ggplot theme
+theme_set(theme_classic2()+
+            theme(panel.grid.major.x = element_line(colour = "grey95"),
+                  panel.grid.major.y = element_line(colour = "grey95")))
+# defining a ggplot object to remove the x axis
+no.x.axis <- theme(axis.title.x=element_blank(),
+                   axis.text.x=element_blank(),
+                   axis.ticks.x=element_blank())
+# defining a ggplot object to remove the y axis
+no.y.axis <- theme(axis.title.y=element_blank(),
+                   axis.text.y=element_blank(),
+                   axis.ticks.y=element_blank())
+
+## fresh start? If FALSE (select 2 in hard bracket), will only rerun a chunk if 
+## changes are detected within the text of that chunk.
+rmCache <- c(TRUE, FALSE)[2] 
+if (rmCache) {
+  tfn <- knitr::current_input()              # name of this file
+  tfn <- substr(tfn, 1, nchar(tfn)-4)        # Remove the ".Rmd"
+  tfn_cache <- paste0(tfn, "_cache")         # Append "_cache" to it
+  if (file.exists(tfn_cache))                # If the cache exists...
+    unlink(tfn_cache, recursive=TRUE)        # ...delete it.
+}
+```  
+
+<!-- The following commands provide a shorthand for common symbols when used in math mode. -->
+
+\newcommand{\um}{\ \mu \mathrm{ m}}
+\newcommand{\mm}{\mathrm{\ mm}}
+\newcommand{\m}{\mathrm{\ m}}
+\newcommand{\N}{\mathrm{^{15}\text{N}}}
+\newcommand{\dN}{\mathrm{\delta^{15}\text{N}}}
+\newcommand{\dNAA}{\mathrm{\delta^{15}\text{N}_\text{AA}}}
+\newcommand{\dNSAA}{\mathrm{\delta^{15}\text{N}_\text{SAA}}}
+\newcommand{\dNTAA}{\mathrm{\delta^{15}\text{N}_\text{TAA}}}
+\newcommand{\dNtr}{\mathrm{\delta^{15}\text{N}_\text{tr}}}
+\newcommand{\dNsrc}{\mathrm{\delta^{15}\text{N}_\text{src}}}
+\newcommand{\dNphe}{\mathrm{\delta^{15}N_{phe}}}
+\newcommand{\dNthr}{\mathrm{\delta^{15}N_{thr}}}
+\newcommand{\dNala}{\mathrm{\delta^{15}N_{ala}}}
+\newcommand{\dNglx}{\mathrm{\delta^{15}N_{glx}}}
+\newcommand{\dNThrPhe}{\mathrm{\delta^{15}N_{thr-phe}}}
+\newcommand{\dNAlaPhe}{\mathrm{\delta^{15}N_{ala-phe}}}
+\newcommand{\dNglxphe}{\mathrm{\delta^{15}N_{glx-phe}}}
+\newcommand{\DN}{\mathrm{\Delta^{15}\text{N}}}
+\newcommand{\DNAA}{\mathrm{\Delta^{15}\text{N}_\text{AA}}}
+\newcommand{\C}{\mathrm{^{13}\text{C}}}
+\newcommand{\dC}{\mathrm{\delta^{13}\text{C}}}
+\newcommand{\dCAA}{\mathrm{\delta^{13}\text{C}_\text{AA}}}
+\newcommand{\dCEAA}{\mathrm{\delta^{13}\text{C}_\text{EAA}}}
+\newcommand{\dCNAA}{\mathrm{\delta^{13}\text{C}_\text{NAA}}}
+\newcommand{\permil}{‰}
+\newcommand{\degree}{°}
+\newcommand{\TP}{\mathrm{TP}}
+\newcommand{\TPala}{\mathrm{TP_{ala-phe}}}
+\newcommand{\TPglx}{\mathrm{TP_{glx-phe}}}
+\newcommand{\TPts}{\mathrm{TP_{tr-src}}}
+\newcommand{\dTP}{\mathrm{\Delta TP_{ala-glx}}}
+
+```{r import_data}
+## set working directory to the same folder that contains this .rmd file
+path <- dirname(rstudioapi::getActiveDocumentContext()$path)
+load(paste(path,"/OSPsim_OMSM1_posteriors.RData",sep=""))
+posts.OMSM1.zoops <- posts.zoops
+posts.OMSM1.zoops.long <- posts.zoops.long
+
+load(paste(path,"/OSPsim_OMSM2_posteriors.RData",sep=""))
+posts.OMSM2.zoops <- posts.zoops
+posts.OMSM2.zoops.long <- posts.zoops.long
+
+# load(paste(path,"/OSPsim_MMO_posteriors.RData",sep=""))
+# posts.MMO.zoops <- posts.zoops
+# posts.MMO.zoops.long <- posts.zoops.long
+
+load(paste(path,"/OSPsim_SMM1_posteriors.RData",sep=""))
+posts.SMM1.zoops <- posts.zoops
+posts.SMM1.zoops.long <- posts.zoops.long
+
+```
+
+```{r posterior_f_ternary, eval=TRUE, dpi=300, fig.asp=0.82, fig.width=8.5}
+
+## Making ternary plots of mixing parameters
+
+ggtern()+
+  stat_confidence_tern(
+    data = posts.OMSM2.zoops$f$samples,
+    aes(x=Surface, y=Large, z=Small,
+        fill = "OMSM(Constrained TDF)"),
+        color="grey20", alpha=0.4, size=0,
+        breaks=c(0.95,0.90,0.75,0.50), geom = "polygon")+
+  stat_confidence_tern(
+    data = posts.OMSM1.zoops$f$samples,
+    aes(x=Surface, y=Large, z=Small,
+        fill = "OMSM(Full TDF)"),
+        color="grey20", alpha=0.4, size=0,
+        breaks=c(0.95,0.90,0.75,0.50), geom = "polygon")+
+  stat_confidence_tern(
+    data = posts.SMM1.zoops$f$samples,
+    aes(x=Surface, y=Large, z=Small,
+        fill = "SMM(Phe, Lys)"),
+        color="grey20", alpha=0.4, size=0,
+        breaks=c(0.95,0.90,0.75,0.50), geom = "polygon")+
+  scale_fill_manual(values=c("steelblue1","steelblue4","orange2"))+
+  geom_point(data = zoops.sim, 
+             aes(x=Surface,
+                 y=Large,
+                 z=Small,
+                 shape=""),
+             color="grey10",size=3, stroke=1, fill="black")+
+  theme_bw()+
+  theme(legend.box="vertical",
+        legend.position = "right",
+        tern.axis.title.T=element_blank(),
+        tern.axis.title.L=element_blank(),
+        tern.axis.title.R=element_blank())+
+  theme_arrowlarge()+
+  scale_shape_manual(values = c(24))+
+  labs(fill="Model Posterior",color="95% HDI",shape="True Solution")+
+  facet_wrap(~ Depth, nrow = 3)
+
+
+```
+
+```{r posterior_f_depth_profiles, eval=TRUE, dpi=300, fig.asp=0.5, fig.width=8.5, eval=FALSE}
+#### f(Surface) ####
+plot.Surface <-
+  ggplot()+
+  geom_line(data = posts.SMM1.zoops$f$HDI95,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+            alpha = 0.5, size = 1,
+            position = position_nudge(y = +0))+
+  geom_line(data = posts.SMM1.zoops$f$HDI90,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+            alpha = 0.7, size = 1.5,
+            position = position_nudge(y = +0))+
+  geom_line(data = posts.SMM1.zoops$f$HDI75,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+            alpha = 0.9, size = 2,
+            position = position_nudge(y = +0))+
+  geom_line(data = posts.SMM1.zoops$f$HDI50,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+            alpha = 1, size = 3,
+            position = position_nudge(y = +0))+
+  geom_point(data = posts.SMM1.zoops$f$mode,
+             aes(x = Surface, y = Depth, group = interaction(Depth, Size), fill = "LMM(Phe, Lys)"),
+             size = 3, shape = 22,
+             position = position_nudge(y = +0))+
+  geom_line(data = posts.OMSM1.zoops$f$HDI95,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = "OMSM(Full TDFs)"),
+            alpha = 0.5, size = 1,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM1.zoops$f$HDI90,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = "OMSM(Full TDFs)"),
+            alpha = 0.7, size = 1.5,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM1.zoops$f$HDI75,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = "OMSM(Full TDFs)"),
+            alpha = 0.9, size = 2,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM1.zoops$f$HDI50,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = "OMSM(Full TDFs)"),
+            alpha = 1, size = 3,
+            position = position_nudge(y = -10))+
+  geom_point(data = posts.OMSM1.zoops$f$mode,
+             aes(x = Surface, y = Depth, group = interaction(Depth, Size), fill = "OMSM(Full TDFs)"),
+             size = 3, shape = 22,
+             position = position_nudge(y = -10))+
+    geom_line(data = posts.OMSM2.zoops$f$HDI95,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = "OMSM(ConstrainedTDFs)"),
+            alpha = 0.5, size = 1,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM2.zoops$f$HDI90,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = "OMSM(ConstrainedTDFs)"),
+            alpha = 0.7, size = 1.5,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM2.zoops$f$HDI75,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = "OMSM(ConstrainedTDFs)"),
+            alpha = 0.9, size = 2,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM2.zoops$f$HDI50,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Size), color = "OMSM(ConstrainedTDFs)"),
+            alpha = 1, size = 3,
+            position = position_nudge(y = -10))+
+  geom_point(data = posts.OMSM2.zoops$f$mode,
+             aes(x = Surface, y = Depth, group = interaction(Depth, Size), fill = "OMSM(ConstrainedTDFs)"),
+             size = 3, shape = 22,
+             position = position_nudge(y = -10))+
+  scale_fill_manual(values=c("steelblue1","steelblue4","orange2"))+
+  scale_color_manual(values=c("steelblue1","steelblue4","orange2"))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,0.50,1))+
+  coord_cartesian(xlim = c(0,1))+
+  labs(color = "Mixing Model Type")+
+  guides(fill=FALSE)
+#### f(Large) ####
+plot.Large <-
+  ggplot()+
+  geom_line(data = posts.SMM1.zoops$f$HDI95,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+            alpha = 0.5, size = 1,
+            position = position_nudge(y = +0))+
+  geom_line(data = posts.SMM1.zoops$f$HDI90,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+            alpha = 0.7, size = 1.5,
+            position = position_nudge(y = +0))+
+  geom_line(data = posts.SMM1.zoops$f$HDI75,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+            alpha = 0.9, size = 2,
+            position = position_nudge(y = +0))+
+  geom_line(data = posts.SMM1.zoops$f$HDI50,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+            alpha = 1, size = 3,
+            position = position_nudge(y = +0))+
+  geom_point(data = posts.SMM1.zoops$f$mode,
+             aes(x = Large, y = Depth, group = interaction(Depth, Size), fill = "LMM(Phe, Lys)"),
+             size = 3, shape = 22,
+             position = position_nudge(y = +0))+
+  geom_line(data = posts.OMSM1.zoops$f$HDI95,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = "OMSM(Full TDFs)"),
+            alpha = 0.5, size = 1,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM1.zoops$f$HDI90,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = "OMSM(Full TDFs)"),
+            alpha = 0.7, size = 1.5,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM1.zoops$f$HDI75,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = "OMSM(Full TDFs)"),
+            alpha = 0.9, size = 2,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM1.zoops$f$HDI50,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = "OMSM(Full TDFs)"),
+            alpha = 1, size = 3,
+            position = position_nudge(y = -10))+
+  geom_point(data = posts.OMSM1.zoops$f$mode,
+             aes(x = Large, y = Depth, group = interaction(Depth, Size), fill = "OMSM(Full TDFs)"),
+             size = 3, shape = 22,
+             position = position_nudge(y = -10))+
+    geom_line(data = posts.OMSM2.zoops$f$HDI95,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = "OMSM(ConstrainedTDFs)"),
+            alpha = 0.5, size = 1,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM2.zoops$f$HDI90,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = "OMSM(ConstrainedTDFs)"),
+            alpha = 0.7, size = 1.5,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM2.zoops$f$HDI75,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = "OMSM(ConstrainedTDFs)"),
+            alpha = 0.9, size = 2,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM2.zoops$f$HDI50,
+            aes(x = Large, y = Depth, group = interaction(Depth, Size), color = "OMSM(ConstrainedTDFs)"),
+            alpha = 1, size = 3,
+            position = position_nudge(y = -10))+
+  geom_point(data = posts.OMSM2.zoops$f$mode,
+             aes(x = Large, y = Depth, group = interaction(Depth, Size), fill = "OMSM(ConstrainedTDFs)"),
+             size = 3, shape = 22,
+             position = position_nudge(y = -10))+
+  scale_fill_manual(values=c("steelblue1","steelblue4","orange2"))+
+  scale_color_manual(values=c("steelblue1","steelblue4","orange2"))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,0.50,1))+
+  coord_cartesian(xlim = c(0,1))+
+  labs(color = "Mixing Model Type")+
+  guides(fill=FALSE)
+#### f(Small) ####
+plot.Small <-
+  ggplot()+
+  geom_line(data = posts.SMM1.zoops$f$HDI95,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+            alpha = 0.5, size = 1,
+            position = position_nudge(y = +0))+
+  geom_line(data = posts.SMM1.zoops$f$HDI90,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+            alpha = 0.7, size = 1.5,
+            position = position_nudge(y = +0))+
+  geom_line(data = posts.SMM1.zoops$f$HDI75,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+            alpha = 0.9, size = 2,
+            position = position_nudge(y = +0))+
+  geom_line(data = posts.SMM1.zoops$f$HDI50,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+            alpha = 1, size = 3,
+            position = position_nudge(y = +0))+
+  geom_point(data = posts.SMM1.zoops$f$mode,
+             aes(x = Small, y = Depth, group = interaction(Depth, Size), fill = "LMM(Phe, Lys)"),
+             size = 3, shape = 22,
+             position = position_nudge(y = +0))+
+  geom_line(data = posts.OMSM1.zoops$f$HDI95,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = "OMSM(Full TDFs)"),
+            alpha = 0.5, size = 1,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM1.zoops$f$HDI90,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = "OMSM(Full TDFs)"),
+            alpha = 0.7, size = 1.5,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM1.zoops$f$HDI75,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = "OMSM(Full TDFs)"),
+            alpha = 0.9, size = 2,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM1.zoops$f$HDI50,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = "OMSM(Full TDFs)"),
+            alpha = 1, size = 3,
+            position = position_nudge(y = -10))+
+  geom_point(data = posts.OMSM1.zoops$f$mode,
+             aes(x = Small, y = Depth, group = interaction(Depth, Size), fill = "OMSM(Full TDFs)"),
+             size = 3, shape = 22,
+             position = position_nudge(y = -10))+
+    geom_line(data = posts.OMSM2.zoops$f$HDI95,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = "OMSM(ConstrainedTDFs)"),
+            alpha = 0.5, size = 1,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM2.zoops$f$HDI90,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = "OMSM(ConstrainedTDFs)"),
+            alpha = 0.7, size = 1.5,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM2.zoops$f$HDI75,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = "OMSM(ConstrainedTDFs)"),
+            alpha = 0.9, size = 2,
+            position = position_nudge(y = -10))+
+  geom_line(data = posts.OMSM2.zoops$f$HDI50,
+            aes(x = Small, y = Depth, group = interaction(Depth, Size), color = "OMSM(ConstrainedTDFs)"),
+            alpha = 1, size = 3,
+            position = position_nudge(y = -10))+
+  geom_point(data = posts.OMSM2.zoops$f$mode,
+             aes(x = Small, y = Depth, group = interaction(Depth, Size), fill = "OMSM(ConstrainedTDFs)"),
+             size = 3, shape = 22,
+             position = position_nudge(y = -10))+
+  scale_fill_manual(values=c("steelblue1","steelblue4","orange2"))+
+  scale_color_manual(values=c("steelblue1","steelblue4","orange2"))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,0.50,1))+
+  coord_cartesian(xlim = c(0,1))+
+  labs(color = "Mixing Model Type")+
+  guides(fill=FALSE)
+# #### f(Submicron) ####
+# plot.Submicron <-
+#   ggplot()+
+#   geom_line(data = posts.MMO.zoops$f$HDI95,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = "LMM(Shea et al. 2023)"),
+#             alpha = 0.5, size = 1,
+#             position = position_nudge(y = +10))+
+#   geom_line(data = posts.MMO.zoops$f$HDI90,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = "LMM(Shea et al. 2023)"),
+#             alpha = 0.7, size = 1.5,
+#             position = position_nudge(y = +10))+
+#   geom_line(data = posts.MMO.zoops$f$HDI75,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = "LMM(Shea et al. 2023)"),
+#             alpha = 0.9, size = 2,
+#             position = position_nudge(y = +10))+
+#   geom_line(data = posts.MMO.zoops$f$HDI50,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = "LMM(Shea et al. 2023)"),
+#             alpha = 1, size = 3,
+#             position = position_nudge(y = +10))+
+#   geom_point(data = posts.MMO.zoops$f$mode,
+#              aes(x = Submicron, y = Depth, group = interaction(Depth, Size), fill = "LMM(Shea et al. 2023)"),
+#              size = 3, shape = 22,
+#              position = position_nudge(y = +10))+
+#   geom_line(data = posts.SMM1.zoops$f$HDI95,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+#             alpha = 0.5, size = 1,
+#             position = position_nudge(y = +0))+
+#   geom_line(data = posts.SMM1.zoops$f$HDI90,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+#             alpha = 0.7, size = 1.5,
+#             position = position_nudge(y = +0))+
+#   geom_line(data = posts.SMM1.zoops$f$HDI75,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+#             alpha = 0.9, size = 2,
+#             position = position_nudge(y = +0))+
+#   geom_line(data = posts.SMM1.zoops$f$HDI50,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+#             alpha = 1, size = 3,
+#             position = position_nudge(y = +0))+
+#   geom_point(data = posts.SMM1.zoops$f$mode,
+#              aes(x = Submicron, y = Depth, group = interaction(Depth, Size), fill = "LMM(Phe, Lys)"),
+#              size = 3, shape = 22,
+#              position = position_nudge(y = +0))+
+#   geom_line(data = posts.FWM.zoops$f$HDI95,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = "Food Web Model"),
+#             alpha = 0.5, size = 1,
+#             position = position_nudge(y = -10))+
+#   geom_line(data = posts.FWM.zoops$f$HDI90,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = "Food Web Model"),
+#             alpha = 0.7, size = 1.5,
+#             position = position_nudge(y = -10))+
+#   geom_line(data = posts.FWM.zoops$f$HDI75,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = "Food Web Model"),
+#             alpha = 0.9, size = 2,
+#             position = position_nudge(y = -10))+
+#   geom_line(data = posts.FWM.zoops$f$HDI50,
+#             aes(x = Submicron, y = Depth, group = interaction(Depth, Size), color = "Food Web Model"),
+#             alpha = 1, size = 3,
+#             position = position_nudge(y = -10))+
+#   geom_point(data = posts.FWM.zoops$f$mode,
+#              aes(x = Submicron, y = Depth, group = interaction(Depth, Size), fill = "Food Web Model"),
+#              size = 3, shape = 22,
+#              position = position_nudge(y = -10))+
+#   scale_fill_manual(values=c("orange3","steelblue1","steelblue4"))+
+#   scale_color_manual(values=c("orange3","steelblue1","steelblue4"))+
+#   scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+#   scale_x_continuous(breaks = c(0,0.50,1))+
+#   coord_cartesian(xlim = c(0,1))+
+#   labs(color = "Mixing Model Type")+
+#   guides(fill=FALSE)
+# #### f(Small+Sub) ####
+# plot.SmallSub <-
+#   ggplot()+
+#   geom_line(data = posts.MMO.zoops$f$HDI95,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = "LMM(Shea et al. 2023)"),
+#             alpha = 0.5, size = 1,
+#             position = position_nudge(y = +10))+
+#   geom_line(data = posts.MMO.zoops$f$HDI90,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = "LMM(Shea et al. 2023)"),
+#             alpha = 0.7, size = 1.5,
+#             position = position_nudge(y = +10))+
+#   geom_line(data = posts.MMO.zoops$f$HDI75,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = "LMM(Shea et al. 2023)"),
+#             alpha = 0.9, size = 2,
+#             position = position_nudge(y = +10))+
+#   geom_line(data = posts.MMO.zoops$f$HDI50,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = "LMM(Shea et al. 2023)"),
+#             alpha = 1, size = 3,
+#             position = position_nudge(y = +10))+
+#   geom_point(data = posts.MMO.zoops$f$mode,
+#              aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), fill = "LMM(Shea et al. 2023)"),
+#              size = 3, shape = 22,
+#              position = position_nudge(y = +10))+
+#   geom_line(data = posts.SMM1.zoops$f$HDI95,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+#             alpha = 0.5, size = 1,
+#             position = position_nudge(y = +0))+
+#   geom_line(data = posts.SMM1.zoops$f$HDI90,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+#             alpha = 0.7, size = 1.5,
+#             position = position_nudge(y = +0))+
+#   geom_line(data = posts.SMM1.zoops$f$HDI75,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+#             alpha = 0.9, size = 2,
+#             position = position_nudge(y = +0))+
+#   geom_line(data = posts.SMM1.zoops$f$HDI50,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = "LMM(Phe, Lys)"),
+#             alpha = 1, size = 3,
+#             position = position_nudge(y = +0))+
+#   geom_point(data = posts.SMM1.zoops$f$mode,
+#              aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), fill = "LMM(Phe, Lys)"),
+#              size = 3, shape = 22,
+#              position = position_nudge(y = +0))+
+#   geom_line(data = posts.FWM.zoops$f$HDI95,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = "Food Web Model"),
+#             alpha = 0.5, size = 1,
+#             position = position_nudge(y = -10))+
+#   geom_line(data = posts.FWM.zoops$f$HDI90,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = "Food Web Model"),
+#             alpha = 0.7, size = 1.5,
+#             position = position_nudge(y = -10))+
+#   geom_line(data = posts.FWM.zoops$f$HDI75,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = "Food Web Model"),
+#             alpha = 0.9, size = 2,
+#             position = position_nudge(y = -10))+
+#   geom_line(data = posts.FWM.zoops$f$HDI50,
+#             aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), color = "Food Web Model"),
+#             alpha = 1, size = 3,
+#             position = position_nudge(y = -10))+
+#   geom_point(data = posts.FWM.zoops$f$mode,
+#              aes(x = SmallSub, y = Depth, group = interaction(Depth, Size), fill = "Food Web Model"),
+#              size = 3, shape = 22,
+#              position = position_nudge(y = -10))+
+#   scale_fill_manual(values=c("orange3","steelblue1","steelblue4"))+
+#   scale_color_manual(values=c("orange3","steelblue1","steelblue4"))+
+#   xlab("Small + Submicron")+
+#   scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+#   scale_x_continuous(breaks = c(0,0.50,1))+
+#   coord_cartesian(xlim = c(0,1))+
+#   labs(color = "Mixing Model Type")+
+#   guides(fill=FALSE)
+
+
+ggarrange(plot.Surface,
+          plot.Large + no.y.axis,
+          plot.Small + no.y.axis,
+          # plot.Submicron + no.y.axis,
+          nrow=1, ncol=4, widths = c(1.33,1,1), common.legend = TRUE, legend="right")
+
+# ggarrange(plot.Surface,
+#           plot.Large + no.y.axis,
+#           plot.SmallSub + no.y.axis,
+#           nrow=1, ncol=3, widths = c(1.18,1,1), common.legend = TRUE, legend="right")
+
+```
+
+```{r posterior_f_depth_profiles_old, eval=FALSE, dpi=300, fig.asp=0.5, fig.width=8.5}
+
+posts.FWM.zoops$f$HDI50$Model <- posts.FWM.zoops$f$HDI75$Model <-
+  posts.FWM.zoops$f$HDI90$Model <- posts.FWM.zoops$f$HDI95$Model <- 
+  posts.FWM.zoops$f$mode$Model <- "Food Web Model"
+posts.SMM1.zoops$f$HDI50$Model <- posts.SMM1.zoops$f$HDI75$Model <-
+  posts.SMM1.zoops$f$HDI90$Model <- posts.SMM1.zoops$f$HDI95$Model <- 
+  posts.SMM1.zoops$f$mode$Model <- "Simple Mixing Model"
+posts.MMO.zoops$f$HDI50$Model <- posts.MMO.zoops$f$HDI75$Model <-
+  posts.MMO.zoops$f$HDI90$Model <- posts.MMO.zoops$f$HDI95$Model <- 
+  posts.MMO.zoops$f$mode$Model <- "LMM(Shea et al. 2023)"
+
+posts.zoops.HDI95 <- rbind(
+  posts.FWM.zoops$f$HDI95,
+  posts.SMM1.zoops$f$HDI95,
+  posts.MMO.zoops$f$HDI95)
+posts.zoops.HDI90 <- rbind(
+  posts.FWM.zoops$f$HDI90,
+  posts.SMM1.zoops$f$HDI90,
+  posts.MMO.zoops$f$HDI90)
+posts.zoops.HDI75 <- rbind(
+  posts.FWM.zoops$f$HDI75,
+  posts.SMM1.zoops$f$HDI75,
+  posts.MMO.zoops$f$HDI75)
+posts.zoops.HDI50 <- rbind(
+  posts.FWM.zoops$f$HDI50,
+  posts.SMM1.zoops$f$HDI50,
+  posts.MMO.zoops$f$HDI50)
+posts.zoops.mode <- rbind(
+  posts.FWM.zoops$f$mode,
+  posts.SMM1.zoops$f$mode,
+  posts.MMO.zoops$f$mode)
+
+#### f(Surface) ####
+plot.Surface <-
+  ggplot()+
+  geom_line(data = posts.zoops.HDI95,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.5, size = 1,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI90,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.7, size = 1.5,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI75,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.9, size = 2,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI50,
+            aes(x = Surface, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 1, size = 3,
+            position = position_dodgev(height = 40))+
+  geom_point(data = posts.zoops.mode,
+             aes(x = Surface, y = Depth, group = interaction(Depth, Model), fill= Model),
+             size = 3, shape = 22,
+             position = position_dodgev(height = 40))+
+  scale_fill_manual(values=c("orange3","steelblue1","steelblue4"))+
+  scale_color_manual(values=c("orange3","steelblue1","steelblue4"))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,0.50,1))+
+  coord_cartesian(xlim = c(0,1))
+#### f(Large) ####
+plot.Large <-
+  ggplot()+
+  geom_line(data = posts.zoops.HDI95,
+            aes(x = Large, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.5, size = 1,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI90,
+            aes(x = Large, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.7, size = 1.5,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI75,
+            aes(x = Large, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.9, size = 2,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI50,
+            aes(x = Large, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 1, size = 3,
+            position = position_dodgev(height = 40))+
+  geom_point(data = posts.zoops.mode,
+             aes(x = Large, y = Depth, group = interaction(Depth, Model), fill= Model),
+             size = 3, shape = 22,
+             position = position_dodgev(height = 40))+
+  scale_fill_manual(values=c("orange3","steelblue1","steelblue4"))+
+  scale_color_manual(values=c("orange3","steelblue1","steelblue4"))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,0.50,1))+
+  coord_cartesian(xlim = c(0,1))
+#### f(Small) ####
+plot.Small <-
+  ggplot()+
+  geom_line(data = posts.zoops.HDI95,
+            aes(x = Small, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.5, size = 1,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI90,
+            aes(x = Small, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.7, size = 1.5,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI75,
+            aes(x = Small, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.9, size = 2,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI50,
+            aes(x = Small, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 1, size = 3,
+            position = position_dodgev(height = 40))+
+  geom_point(data = posts.zoops.mode,
+             aes(x = Small, y = Depth, group = interaction(Depth, Model), fill= Model),
+             size = 3, shape = 22,
+             position = position_dodgev(height = 40))+
+  scale_fill_manual(values=c("orange3","steelblue1","steelblue4"))+
+  scale_color_manual(values=c("orange3","steelblue1","steelblue4"))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,0.50,1))+
+  coord_cartesian(xlim = c(0,1))
+#### f(Submicron) ####
+plot.Submicron <-
+  ggplot()+
+  geom_line(data = posts.zoops.HDI95,
+            aes(x = Submicron, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.5, size = 1,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI90,
+            aes(x = Submicron, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.7, size = 1.5,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI75,
+            aes(x = Submicron, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.9, size = 2,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI50,
+            aes(x = Submicron, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 1, size = 3,
+            position = position_dodgev(height = 40))+
+  geom_point(data = posts.zoops.mode,
+             aes(x = Submicron, y = Depth, group = interaction(Depth, Model), fill= Model),
+             size = 3, shape = 22,
+             position = position_dodgev(height = 40))+
+  scale_fill_manual(values=c("orange3","steelblue1","steelblue4"))+
+  scale_color_manual(values=c("orange3","steelblue1","steelblue4"))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,0.50,1))+
+  coord_cartesian(xlim = c(0,1))
+#### f(Small+Sub) ####
+plot.SmallSub <-
+  ggplot()+
+  geom_line(data = posts.zoops.HDI95,
+            aes(x = SmallSub, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.5, size = 1,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI90,
+            aes(x = SmallSub, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.7, size = 1.5,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI75,
+            aes(x = SmallSub, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 0.9, size = 2,
+            position = position_dodgev(height = 40))+
+  geom_line(data = posts.zoops.HDI50,
+            aes(x = SmallSub, y = Depth, group = interaction(Depth, Model), color = Model),
+            alpha = 1, size = 3,
+            position = position_dodgev(height = 40))+
+  geom_point(data = posts.zoops.mode,
+             aes(x = SmallSub, y = Depth, group = interaction(Depth, Model), fill= Model),
+             size = 3, shape = 22,
+             position = position_dodgev(height = 40))+
+  scale_fill_manual(values=c("orange3","steelblue1","steelblue4"))+
+  scale_color_manual(values=c("orange3","steelblue1","steelblue4"))+
+  scale_y_reverse(breaks = c(0,100,200,300,400,500,750,1000)) + 
+  scale_x_continuous(breaks = c(0,0.50,1))+
+  coord_cartesian(xlim = c(0,1))
+
+
+ggarrange(plot.Surface,
+          plot.Large + no.y.axis,
+          plot.Small + no.y.axis,
+          plot.Submicron + no.y.axis,
+          nrow=1, ncol=4, widths = c(1.25,1,1,1), common.legend = TRUE, legend="right")
+
+ggarrange(plot.Surface,
+          plot.Large + no.y.axis,
+          plot.SmallSub + no.y.axis,
+          nrow=1, ncol=3, widths = c(1.18,1,1), common.legend = TRUE, legend="right")
+
+```
+
+```{r posterior_f_comparisons, eval=TRUE, dpi=300, fig.asp=0.4, fig.width=8.5}
+
+posts.SMM1.zoops$f$HDI50$Model <- posts.SMM1.zoops$f$HDI75$Model <-
+  posts.SMM1.zoops$f$HDI90$Model <- posts.SMM1.zoops$f$HDI95$Model <- 
+  posts.SMM1.zoops$f$mode$Model <- "SMM(Phe,Lys)"
+posts.OMSM1.zoops$f$HDI50$Model <- posts.OMSM1.zoops$f$HDI75$Model <-
+  posts.OMSM1.zoops$f$HDI90$Model <- posts.OMSM1.zoops$f$HDI95$Model <- 
+  posts.OMSM1.zoops$f$mode$Model <- "OMSM(Full TDFs)"
+posts.OMSM2.zoops$f$HDI50$Model <- posts.OMSM2.zoops$f$HDI75$Model <-
+  posts.OMSM2.zoops$f$HDI90$Model <- posts.OMSM2.zoops$f$HDI95$Model <- 
+  posts.OMSM2.zoops$f$mode$Model <- "OMSM(Constrained TDFs)"
+
+
+posts.zoops.HDI95 <- rbind(
+  posts.OMSM1.zoops$f$HDI95,
+  posts.OMSM2.zoops$f$HDI95,
+  posts.SMM1.zoops$f$HDI95)
+posts.zoops.HDI90 <- rbind(
+  posts.OMSM1.zoops$f$HDI90,
+  posts.OMSM2.zoops$f$HDI90,
+  posts.SMM1.zoops$f$HDI90)
+posts.zoops.HDI75 <- rbind(
+  posts.OMSM1.zoops$f$HDI75,
+  posts.OMSM2.zoops$f$HDI75,
+  posts.SMM1.zoops$f$HDI75)
+posts.zoops.HDI50 <- rbind(
+  posts.OMSM1.zoops$f$HDI50,
+  posts.OMSM2.zoops$f$HDI50,
+  posts.SMM1.zoops$f$HDI50)
+posts.zoops.mode <- rbind(
+  posts.OMSM1.zoops$f$mode,
+  posts.OMSM2.zoops$f$mode,
+  posts.SMM1.zoops$f$mode)
+
+# zoops.f$SurfLarge <- zoops.f$Surface + zoops.f$Large
+# zoops.f$LargeSmall <- zoops.f$Large + zoops.f$Small
+# zoops.f$SmallSub <- zoops.f$Small + zoops.f$Submicron
+
+nzoops=nrow(zoops.sim)
+
+plot.Surface <-
+  ggplot()+
+  geom_line(data = posts.zoops.HDI95,
+            aes(x = Group, y = Surface, group = interaction(Group,Model), color = Model),
+            alpha = 0.5, size = 0.5,
+            position = position_dodge(width = 0.6))+
+  geom_line(data = posts.zoops.HDI90,
+            aes(x = Group, y = Surface, group = interaction(Group,Model), color = Model),
+            alpha = 0.7, size = 1,
+            position = position_dodge(width = 0.6))+
+  geom_line(data = posts.zoops.HDI75,
+            aes(x = Group, y = Surface, group = interaction(Group,Model), color = Model),
+            alpha = 0.9, size = 1.5,
+            position = position_dodge(width = 0.6))+
+  geom_line(data = posts.zoops.HDI50,
+            aes(x = Group, y = Surface, group = interaction(Group,Model), color = Model),
+            alpha = 1, size = 2,
+            position = position_dodge(width = 0.6))+
+  geom_segment(
+    aes(y=zoops.f$Surface, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
+        lty=""),
+    size=0.5,alpha=1, color="black")+
+  scale_color_manual(values=c("steelblue1","steelblue4","orange2"))+
+  scale_fill_manual(values=c("steelblue1","steelblue4","orange2"))+
+  scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9))+
+  labs(fill="Model Posterior", color="Model Type", lty="True Value")+
+  xlab("Zooplankton Sample") + ylab("surface") + ylim(c(0,1))
+plot.Large <-
+  ggplot()+
+  geom_line(data = posts.zoops.HDI95,
+            aes(x = Group, y = Large, group = interaction(Group,Model), color = Model),
+            alpha = 0.5, size = 0.5,
+            position = position_dodge(width = 0.6))+
+  geom_line(data = posts.zoops.HDI90,
+            aes(x = Group, y = Large, group = interaction(Group,Model), color = Model),
+            alpha = 0.7, size = 1,
+            position = position_dodge(width = 0.6))+
+  geom_line(data = posts.zoops.HDI75,
+            aes(x = Group, y = Large, group = interaction(Group,Model), color = Model),
+            alpha = 0.9, size = 1.5,
+            position = position_dodge(width = 0.6))+
+  geom_line(data = posts.zoops.HDI50,
+            aes(x = Group, y = Large, group = interaction(Group,Model), color = Model),
+            alpha = 1, size = 2,
+            position = position_dodge(width = 0.6))+
+  geom_segment(
+    aes(y=zoops.f$Large, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
+        lty=""),
+    size=0.5,alpha=1, color="black")+
+  scale_color_manual(values=c("steelblue1","steelblue4","orange2"))+
+  scale_fill_manual(values=c("steelblue1","steelblue4","orange2"))+
+  scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9))+
+  labs(fill="Model Posterior", color="Model Type", lty="True Value")+
+  xlab("Zooplankton Sample") + ylab("large") + ylim(c(0,1))
+plot.Small <-
+  ggplot()+
+  geom_line(data = posts.zoops.HDI95,
+            aes(x = Group, y = Small, group = interaction(Group,Model), color = Model),
+            alpha = 0.5, size = 0.5,
+            position = position_dodge(width = 0.6))+
+  geom_line(data = posts.zoops.HDI90,
+            aes(x = Group, y = Small, group = interaction(Group,Model), color = Model),
+            alpha = 0.7, size = 1,
+            position = position_dodge(width = 0.6))+
+  geom_line(data = posts.zoops.HDI75,
+            aes(x = Group, y = Small, group = interaction(Group,Model), color = Model),
+            alpha = 0.9, size = 1.5,
+            position = position_dodge(width = 0.6))+
+  geom_line(data = posts.zoops.HDI50,
+            aes(x = Group, y = Small, group = interaction(Group,Model), color = Model),
+            alpha = 1, size = 2,
+            position = position_dodge(width = 0.6))+
+  geom_segment(
+    aes(y=zoops.f$Small, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
+        lty=""),
+    size=0.5,alpha=1, color="black")+
+  scale_color_manual(values=c("steelblue1","steelblue4","orange2"))+
+  scale_fill_manual(values=c("steelblue1","steelblue4","orange2"))+
+  scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9))+
+  labs(fill="Model Posterior", color="Model Type", lty="True Value")+
+  xlab("Zooplankton Sample") + ylab("small") + ylim(c(0,1))
+# plot.Submicron <-
+#   ggplot()+
+#   geom_line(data = posts.zoops.HDI95,
+#             aes(x = Group, y = Submicron, group = interaction(Group,Model), color = Model),
+#             alpha = 0.5, size = 0.5,
+#             position = position_dodge(width = 0.6))+
+#   geom_line(data = posts.zoops.HDI90,
+#             aes(x = Group, y = Submicron, group = interaction(Group,Model), color = Model),
+#             alpha = 0.7, size = 1,
+#             position = position_dodge(width = 0.6))+
+#   geom_line(data = posts.zoops.HDI75,
+#             aes(x = Group, y = Submicron, group = interaction(Group,Model), color = Model),
+#             alpha = 0.9, size = 1.5,
+#             position = position_dodge(width = 0.6))+
+#   geom_line(data = posts.zoops.HDI50,
+#             aes(x = Group, y = Submicron, group = interaction(Group,Model), color = Model),
+#             alpha = 1, size = 2,
+#             position = position_dodge(width = 0.6))+
+#   geom_segment(
+#     aes(y=zoops.f$Submicron, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
+#         lty=""),
+#     size=0.5,alpha=1, color="black")+
+#   scale_color_manual(values=c("orange3","steelblue1","steelblue4"))+
+#   scale_fill_manual(values=c("orange3","steelblue1","steelblue4"))+
+#   scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9))+
+#   labs(fill="Model Posterior", color="Model Type", lty="True Value")+
+#   xlab("Zooplankton Sample") + ylab("submicron") + ylim(c(0,1))
+# plot.SurfLarge <-
+#   ggplot()+
+#   geom_line(data = posts.zoops.HDI95,
+#             aes(x = Group, y = SurfLarge, group = interaction(Group,Model), color = Model),
+#             alpha = 0.5, size = 0.5,
+#             position = position_dodge(width = 0.6))+
+#   geom_line(data = posts.zoops.HDI90,
+#             aes(x = Group, y = SurfLarge, group = interaction(Group,Model), color = Model),
+#             alpha = 0.7, size = 1,
+#             position = position_dodge(width = 0.6))+
+#   geom_line(data = posts.zoops.HDI75,
+#             aes(x = Group, y = SurfLarge, group = interaction(Group,Model), color = Model),
+#             alpha = 0.9, size = 1.5,
+#             position = position_dodge(width = 0.6))+
+#   geom_line(data = posts.zoops.HDI50,
+#             aes(x = Group, y = SurfLarge, group = interaction(Group,Model), color = Model),
+#             alpha = 1, size = 2,
+#             position = position_dodge(width = 0.6))+
+#   geom_segment(
+#     aes(y=zoops.f$SurfLarge, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
+#         lty=""),
+#     size=0.5,alpha=1, color="black")+
+#   scale_color_manual(values=c("orange3","steelblue1","steelblue4"))+
+#   scale_fill_manual(values=c("orange3","steelblue1","steelblue4"))+
+#   scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9))+
+#   labs(fill="Model Posterior", color="Model Type", lty="True Value")+
+#   xlab("Zooplankton Sample") + ylab("surf + large") + ylim(c(0,1))
+# plot.LargeSmall <-
+#   ggplot()+
+#   geom_line(data = posts.zoops.HDI95,
+#             aes(x = Group, y = LargeSmall, group = interaction(Group,Model), color = Model),
+#             alpha = 0.5, size = 0.5,
+#             position = position_dodge(width = 0.6))+
+#   geom_line(data = posts.zoops.HDI90,
+#             aes(x = Group, y = LargeSmall, group = interaction(Group,Model), color = Model),
+#             alpha = 0.7, size = 1,
+#             position = position_dodge(width = 0.6))+
+#   geom_line(data = posts.zoops.HDI75,
+#             aes(x = Group, y = LargeSmall, group = interaction(Group,Model), color = Model),
+#             alpha = 0.9, size = 1.5,
+#             position = position_dodge(width = 0.6))+
+#   geom_line(data = posts.zoops.HDI50,
+#             aes(x = Group, y = LargeSmall, group = interaction(Group,Model), color = Model),
+#             alpha = 1, size = 2,
+#             position = position_dodge(width = 0.6))+
+#   geom_segment(
+#     aes(y=zoops.f$LargeSmall, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
+#         lty=""),
+#     size=0.5,alpha=1, color="black")+
+#   scale_color_manual(values=c("orange3","steelblue1","steelblue4"))+
+#   scale_fill_manual(values=c("orange3","steelblue1","steelblue4"))+
+#   scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9))+
+#   labs(fill="Model Posterior", color="Model Type", lty="True Value")+
+#   xlab("Zooplankton Sample") + ylab("large + small") + ylim(c(0,1))
+# plot.SmallSub <-
+#   ggplot()+
+#   geom_line(data = posts.zoops.HDI95,
+#             aes(x = Group, y = SmallSub, group = interaction(Group,Model), color = Model),
+#             alpha = 0.5, size = 0.5,
+#             position = position_dodge(width = 0.6))+
+#   geom_line(data = posts.zoops.HDI90,
+#             aes(x = Group, y = SmallSub, group = interaction(Group,Model), color = Model),
+#             alpha = 0.7, size = 1,
+#             position = position_dodge(width = 0.6))+
+#   geom_line(data = posts.zoops.HDI75,
+#             aes(x = Group, y = SmallSub, group = interaction(Group,Model), color = Model),
+#             alpha = 0.9, size = 1.5,
+#             position = position_dodge(width = 0.6))+
+#   geom_line(data = posts.zoops.HDI50,
+#             aes(x = Group, y = SmallSub, group = interaction(Group,Model), color = Model),
+#             alpha = 1, size = 2,
+#             position = position_dodge(width = 0.6))+
+#   geom_segment(
+#     aes(y=zoops.f$SmallSub, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
+#         lty=""),
+#     size=0.5,alpha=1, color="black")+
+#   scale_color_manual(values=c("orange3","steelblue1","steelblue4"))+
+#   scale_fill_manual(values=c("orange3","steelblue1","steelblue4"))+
+#   scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9))+
+#   labs(fill="Model Posterior", color="Model Type", lty="True Value")+
+#   xlab("Zooplankton Sample") + ylab("small + sub") + ylim(c(0,1))
+
+# ggarrange(
+  ggarrange(
+    plot.Surface + no.x.axis,
+    plot.Large + no.x.axis,
+    plot.Small + no.x.axis,
+    # plot.Submicron + theme(axis.title.x = element_blank()),
+    nrow = 3, ncol = 1, heights = c(1,1,1.1), common.legend = TRUE)#,
+  # ggplot()+geom_blank()+theme_void(),
+  # ggarrange(
+  #   ggplot()+geom_blank()+theme_void()+ggtitle("Pooled Sources")+theme(plot.title = element_text(hjust = 0.5)),
+  #   plot.SurfLarge + no.x.axis,
+  #   plot.LargeSmall + no.x.axis,
+  #   plot.SmallSub + theme(axis.title.x = element_blank()),
+  #   ggplot()+geom_blank()+theme_void(),
+  #   nrow = 5, ncol = 1, heights = c(0.2,1,1,1.1,0.1), legend="right", common.legend = TRUE),
+  # nrow = 1, ncol = 3, widths = c(1,0.1,1.7), legend = "none")
+```
+
+```{r f_comparison_2, dpi=300, fig.width=6, fig.asp=0.4}
+
+ggarrange(
+    plot.Surface + no.x.axis,
+    plot.Large + no.x.axis,
+    plot.Small + theme(axis.title.x = element_blank()),
+    nrow = 3, ncol = 1, heights = c(1,1,1.1), legend = "right", common.legend = TRUE)
+
+```
+
+
+Next we're going to try and calculate a numerical score for the discrepancy between the model posterior and the true value. We'll use the mode to summarize the posterior values.
+
+```{r discrepancy}
+data.true <- rbind(zoops.f,zoops.f,zoops.f)[c("Surface","Large","Small")]
+data.model <- posts.zoops.mode[c("Surface","Large","Small")]
+
+data.disc <- data.model-data.true
+data.disc$Model <- posts.zoops.mode$Model
+data.disc$Model <- factor(data.disc$Model, levels = c("OMSM(Constrained TDFs)",
+                                                      "OMSM(Full TDFs)",
+                                                      "SMM(Phe,Lys)"))
+
+data.disc.abs <- abs(data.disc[c("Surface","Large","Small")])
+data.disc.abs$Model <- data.disc$Model
+
+data.disc.sum <- aggregate(.~Model,
+                            data=data.disc.abs,
+                            FUN=sum)
+data.disc.sum
+
+data.disc.mean <- aggregate(.~Model,
+                            data=data.disc.abs,
+                            FUN=mean)
+data.disc.mean
+
+```
