@@ -112,10 +112,12 @@ OMSM_Source_Data_and_Priors_3 <-
   /* priors for the zooplankton */
     for (iz in 1:N_Z) { # N_Z is the number of zooplankton
       pz[iz, 1:3] ~ ddirch(c(1,1,1)) # uniform priors
-      MTS[iz] ~ dunif(0,10) # prior for food web length 
-      sdMTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
-      PTS[iz] ~  dunif(0,10) # prior for protistan trophic steps
-      sdPTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
+      # FWL[iz] ~ dunif(0,10) # prior for food web length 
+      # sdFWL[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
+      # MTS[iz] ~ dunif(0,10) # prior for food web length 
+      # sdMTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
+      # PTS[iz] ~  dunif(0,10) # prior for protistan trophic steps
+      # sdPTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
     }"
 OMSM_Source_Data_and_Priors_4 <-
   "/* observe tracers in sources */
@@ -257,7 +259,7 @@ OMSM_Source_Data_and_Priors_5 <-
   /* priors for the zooplankton */
     for (iz in 1:N_Z) { # N_Z is the number of zooplankton
       pz[iz, 1:5] ~ ddirch(c(1,1,1,1,1)) # uniform priors
-      MTS[iz] ~ dunif(0,10) # prior for food web length 
+      MTS[iz] ~ dunif(0,10) # prior for food web length
       sdMTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
       PTS[iz] ~  dunif(0,10) # prior for protistan trophic steps
       sdPTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
@@ -345,8 +347,8 @@ OMSM_Source_Data_and_Priors_6 <-
       pz[iz, 1:6] ~ ddirch(c(1,1,1,1,1,1)) # uniform priors
       MTS[iz] ~ dunif(0,10) # prior for food web length 
       sdMTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
-      PTS[iz] ~  dunif(0,10) # prior for protistan trophic steps
-      sdPTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
+      FWL[iz] ~  dunif(0,10) # prior for protistan trophic steps
+      sdFWL[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
     }"
 
 OMSM_Mixing_2 <-
@@ -392,10 +394,6 @@ OMSM_Mixing_6 <-
                         pz[iz,4]*mean_D[j] + pz[iz,5]*mean_E[j] + pz[iz,6]*mean_F[j]
       }"
 
-OMSM_Trophic_Parameters <-
-  "      ## Carrying out trophic enrichment from food web base to zooplankton
-      ## calculating FWL from MTS and PTS
-      FWL[iz] <- MTS[iz] + PTS[iz]"
 OMSM_Discrimination_Conservative <-
   "      ## Non-fractionating AAs
       for (j in i_T_non) {
@@ -406,27 +404,34 @@ OMSM_Discrimination_Constant <-
   "      ## AAs with constant TDFs
       for (j in i_T_const) {
         mean_z[iz,j]  <- mean_b[iz, j] + FWL[iz]*TDF_meta[j]
-        va_z[iz,j]    <- sd_Y[iz,j]^2 +
-                         (FWL[iz]*sdTDF_meta[j])^2 +
-                         (TDF_meta[j]*sqrt(sdPTS[iz]^2+sdMTS[iz]^2))^2
+        va_z[iz,j]    <- sd_Y[iz,j]^2 + 
+                         (FWL[iz]*TDF_meta[j] * (sdTDF_meta[j]*TDF_meta[j]^-1))^2
       }"
 OMSM_Discrimination_Variable <-
-  # "      ## AAs with variable TDFs
-  #     for (j in i_T_var) {
-  #       mean_z[iz,j]  <- mean_b[iz, j]  + MTS[iz]*TDF_meta[j]
-  #       va_z[iz,j]    <- sd_Y[iz,j]^2 +
-  #                        (MTS[iz]*sdTDF_meta[j])^2+
-  #                        (TDF_meta[j]*sdMTS[iz])^2
-  #     }"
 "      ## AAs with variable TDFs
       for (j in i_T_var) {
         mean_z[iz,j]  <- mean_b[iz, j]  + PTS[iz]*TDF_proto[j] + MTS[iz]*TDF_meta[j]
-        va_z[iz,j]    <- sd_Y[iz,j]^2 +
-                         (PTS[iz]*sdTDF_proto[j])^2+
-                         (MTS[iz]*sdTDF_meta[j])^2+
-                         (TDF_proto[j]*sdPTS[iz])^2+
-                         (TDF_meta[j]*sdMTS[iz])^2
+        va_z[iz,j]    <- sd_Y[iz,j]^2 + 
+                         (PTS[iz]*TDF_proto[j] * (sdTDF_proto[j]*TDF_proto[j]^-1))^2 +
+                         (MTS[iz]*TDF_meta[j] * (sdTDF_meta[j]*TDF_meta[j]^-1))^2
       }"
+
+OMSM_Trophic_Parameters <-
+  "      ## Carrying out trophic enrichment from food web base to zooplankton
+      ## calculating FWL from MTS and PTS
+      mean_FWL[iz] <- (Y[iz,i_T_FWL] - mean_b[iz,i_T_FWL]) * TDF_meta[i_T_FWL]^-1
+      va_FWL[iz] <- mean_FWL[iz] *
+                    (sd_Y[iz,i_T_FWL] * Y[iz,i_T_FWL]^-1)^2 + 
+                    (sdTDF_meta[i_T_FWL] * TDF_meta[i_T_FWL]^-1)^2
+      mean_MTS[iz] <- (Y[iz,i_T_MTS] - mean_b[iz,i_T_MTS]) * TDF_meta[i_T_MTS]^-1
+      va_MTS[iz] <- mean_MTS[iz] *
+                    (sd_Y[iz,i_T_MTS] * Y[iz,i_T_MTS]^-1)^2 + 
+                    (sdTDF_meta[i_T_MTS] * TDF_meta[i_T_MTS]^-1)^2
+      FWL[iz] ~ dnorm(mean_FWL[iz], va_FWL[iz]^-1) T(1,)
+      MTS[iz] ~ dnorm(mean_MTS[iz], va_MTS[iz]^-1) T(0,)
+      PTS[iz] <- FWL[iz] - MTS[iz]
+"
+
 OMSM_Observing_Consumers <-
   "      ## tracer observations
       for (j in i_T_mix) {

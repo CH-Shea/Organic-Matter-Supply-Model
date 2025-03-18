@@ -4,7 +4,8 @@ OMSM_Zoop_Extract <- function(
     Data.zoops,
     Tracers.all,
     Tracers.frac,
-    Tracers.varTDF
+    Tracers.varTDF,
+    combine = c()
 ){
   
   ## Grabbing MCMC model output
@@ -250,37 +251,45 @@ posts.zoops.long <- list(
   )
 )
 
-# # last, we will at times want to pool two mixing parameters to fit on a ternary diagram
-# # Large + Small particles
-# temp1<-temp2<-temp3<-temp4<-temp5<-temp6<-temp7<- c()
-# for (i in 1:nzoops) {
-#     temp1 <- c(temp1, sams[,paste("pz[",i,",2]",sep = "")]+sams[,paste("pz[",i,",3]",sep = "")])
-#     temp2 <- 
-#       c(temp2, HDIofMCMC(sams[,paste("pz[",i,",2]",sep = "")]+
-#                            sams[,paste("pz[",i,",3]",sep = "")], credMass=0.95))
-#     temp3 <- 
-#       c(temp3, HDIofMCMC(sams[,paste("pz[",i,",2]",sep = "")]+
-#                            sams[,paste("pz[",i,",3]",sep = "")], credMass=0.90))
-#     temp4 <- 
-#       c(temp4, HDIofMCMC(sams[,paste("pz[",i,",2]",sep = "")]+
-#                            sams[,paste("pz[",i,",3]",sep = "")], credMass=0.75))
-#     temp5 <- 
-#       c(temp5, HDIofMCMC(sams[,paste("pz[",i,",2]",sep = "")]+
-#                            sams[,paste("pz[",i,",3]",sep = "")], credMass=0.50))
-#     temp6 <- 
-#       c(temp6, mean(sams[,paste("pz[",i,",2]",sep = "")]+
-#                       sams[,paste("pz[",i,",3]",sep = "")]))
-#     temp7 <- 
-#       c(temp7, post.mode(sams[,paste("pz[",i,",2]",sep = "")]+
-#                            sams[,paste("pz[",i,",3]",sep = "")]))
-#   }
-#   posts.zoops$f$samples$LargeSmall <- temp1
-#   posts.zoops$f$HDI95$LargeSmall <- temp2
-#   posts.zoops$f$HDI90$LargeSmall <- temp3
-#   posts.zoops$f$HDI75$LargeSmall <- temp4
-#   posts.zoops$f$HDI50$LargeSmall <- temp5
-#   posts.zoops$f$mean$LargeSmall <- temp6
-#   posts.zoops$f$mode$LargeSmall <- temp7
+# last, we will at times want to pool two mixing parameters to fit on a ternary diagram
+if(length(combine)==2){
+  sourceA <- which(Sources==combine[1])
+  sourceB <- which(Sources==combine[2])
+  # Large + Small particles
+  temp1<-temp2<-temp3<-temp4<-temp5<-temp6<-temp7<- c()
+  for (i in 1:nzoops) {
+    temp1 <- c(temp1, sams[,paste("pz[",i,",",sourceA,"]",sep = "")]+sams[,paste("pz[",i,",",sourceB,"]",sep = "")])
+    temp2 <-
+      c(temp2, HDIofMCMC(sams[,paste("pz[",i,",",sourceA,"]",sep = "")]+
+                           sams[,paste("pz[",i,",",sourceB,"]",sep = "")], credMass=0.95))
+    temp3 <-
+      c(temp3, HDIofMCMC(sams[,paste("pz[",i,",",sourceA,"]",sep = "")]+
+                           sams[,paste("pz[",i,",",sourceB,"]",sep = "")], credMass=0.90))
+    temp4 <-
+      c(temp4, HDIofMCMC(sams[,paste("pz[",i,",",sourceA,"]",sep = "")]+
+                           sams[,paste("pz[",i,",",sourceB,"]",sep = "")], credMass=0.75))
+    temp5 <-
+      c(temp5, HDIofMCMC(sams[,paste("pz[",i,",",sourceA,"]",sep = "")]+
+                           sams[,paste("pz[",i,",",sourceB,"]",sep = "")], credMass=0.50))
+    temp6 <-
+      c(temp6, mean(sams[,paste("pz[",i,",",sourceA,"]",sep = "")]+
+                      sams[,paste("pz[",i,",",sourceB,"]",sep = "")]))
+    temp7 <-
+      c(temp7, post.mode(sams[,paste("pz[",i,",",sourceA,"]",sep = "")]+
+                           sams[,paste("pz[",i,",",sourceB,"]",sep = "")]))
+  }
+  nameAB <- paste(combine[1],combine[2], sep="")
+  posts.zoops$f$samples[nameAB] <- temp1
+  posts.zoops$f$HDI95[nameAB] <- temp2
+  posts.zoops$f$HDI90[nameAB] <- temp3
+  posts.zoops$f$HDI75[nameAB] <- temp4
+  posts.zoops$f$HDI50[nameAB] <- temp5
+  posts.zoops$f$mean[nameAB] <- temp6
+  posts.zoops$f$mode[nameAB] <- temp7
+} else {
+  warning("argument combine should be a vector of two source names")
+}
+
 #   
 # # Small + Submicron particles
 # temp1<-temp2<-temp3<-temp4<-temp5<-temp6<-temp7<- c()
