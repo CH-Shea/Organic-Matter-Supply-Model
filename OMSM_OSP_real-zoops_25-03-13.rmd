@@ -27,7 +27,7 @@ rm(list=ls())
 
 # fresh start? If FALSE (select 2 in hard bracket), will only rerun a chunk if 
 # changes are detected within the text of that chunk.
-rmCache <- c(TRUE, FALSE)[1] 
+rmCache <- c(TRUE, FALSE)[2] 
 tfn <- knitr::current_input()              # name of this file
 tfn <- substr(tfn, 1, nchar(tfn)-4)        # Remove the ".Rmd"
 tfn_cache <- paste0("Caches/", tfn, "_cache")         # Append "_cache" to it
@@ -73,15 +73,16 @@ gr <- (1+sqrt(5))/2 # golden ratio, for figures
 opts_chunk$set(comment="  ",
                fig.asp=0.9/gr,       # <--- gr used here
                fig.align="center",
+               fig.width=5,
+               out.width="95%",
+               dpi=96, # set to 300 for important figures
+               dev="png", # png, svg, pdf, jpg, tiff
                #echo=FALSE,
                cache=c(TRUE, FALSE)[1], 
                cache.path = paste0(tfn_cache,"/"),
                fig.path = paste0(tfn_figures,"/"),
                eval.after="fig.cap", # for dynamic captions
-               collapse=TRUE, 
-               dev="png", # svg, pdf, jpg, tiff
-               fig.width=7.0,
-               out.width="95%"
+               collapse=TRUE
                )
 
 ## defining additional functions we might need
@@ -109,7 +110,7 @@ source("Functions/Post-Mode.R") # contains function post.mode()
 source("Functions/SplitViolin.R") # contains function geom_split_violin()
 # Also loading up some functions we've written for key modelling and simulation tasks
 # source("Functions/OMSM_Gen_Model.R")
-source("Functions/OMSM3_Gen_Model.R")
+source("Functions/OMSM_Gen_Model.R")
 source("Functions/Sim_Zoop.R")
 source("Functions/Sim_Zoop_RealPhe.R")
 source("Functions/OMSM_Global_Extract.R")
@@ -213,27 +214,27 @@ SDTracers$MTS <-
 # Tracers for trophic equations must not be included in this list
 Tracers$mix <-
   c(
-    "d15NAla",
-    "d15NAsx",
-    # "d13CLeu",
-    # "d13CIle",
+    # "d15NAla",
+    # # "d15NAsx",
+    # # "d13CLeu",
+    # # "d13CIle",
     # # "d15NPro",
     "d15NThr",
-    # "d15NSer",
-    # "d15NGly",
+    # # "d15NSer",
+    # # "d15NGly",
     "d15NLys",
     "d15NPhe"
   )
 SDTracers$mix <-
   c(
-    "SDd15NAla",
-    "SDd15NAsx",
-    # "SDd13CLeu",
-    # "SDd13CIle",
-    # "SDd15NPro",
+    # "SDd15NAla",
+    # # "SDd15NAsx",
+    # # "SDd13CLeu",
+    # # "SDd13CIle",
+    # # "SDd15NPro",
     "SDd15NThr",
-    # "SDd15NSer",
-    # "SDd15NGly",
+    # # "SDd15NSer",
+    # # "SDd15NGly",
     "SDd15NLys",
     "SDd15NPhe"
   )
@@ -241,6 +242,7 @@ SDTracers$mix <-
 # Specify the names for all tracers with constant trophic discrimination  and their uncertainty(i.e., TDF(protozoan) = TDF(metazoan))
 Tracers$constTDF <- 
   c(
+    # "d15NPhe",
     "d15NAla", 
     "d15NPro", 
     "d15NSer", 
@@ -250,6 +252,7 @@ Tracers$constTDF <-
   )
 SDTracers$constTDF <- 
   c(
+    # "SDd15NPhe",
     "SDd15NAla", 
     "SDd15NPro", 
     "SDd15NSer", 
@@ -357,7 +360,7 @@ if(length(Tracers$mix) < 3){
 ## Note that these TDFs should NOT be normalized to any source amino acid.
 TDF_meta <- data.frame("d15NAla" = 6.3, "SDd15NAla" = 2.6,
                        "d15NGly" = 2.9, "SDd15NGly" = 3.1,
-                       "d15NThr" =-4.9, "SDd15NThr" = 3.5,
+                       "d15NThr" =-2.1, "SDd15NThr" = 0.9,
                        "d15NSer" = 2.6, "SDd15NSer" = 3.2,
                        "d15NVal" = 4.4, "SDd15NVal" = 2.6,
                        "d15NLeu" = 5.6, "SDd15NLeu" = 2.4,
@@ -374,7 +377,7 @@ TDF_meta <- data.frame("d15NAla" = 6.3, "SDd15NAla" = 2.6,
 # Note that these TDFs should NOT be normalized to any source amino acid.
 TDF_proto = data.frame("d15NAla" = 6.3, "SDd15NAla" = 2.6,
                        "d15NGly" = 2.9, "SDd15NGly" = 3.1,
-                       "d15NThr" =-2.1, "SDd15NThr" = 1.0,
+                       "d15NThr" =-2.1, "SDd15NThr" = 0.9,
                        "d15NSer" = 2.6, "SDd15NSer" = 3.2,
                        "d15NVal" = 0.7, "SDd15NVal" = 1.6,
                        "d15NLeu" = 1.4, "SDd15NLeu" = 0.6,
@@ -504,7 +507,8 @@ Data.zoops <-
 Data.zoops <- 
   subset(Data.zoops,
          ((Depth < 100 | Depth > 200)&
-             (Type == "Zooplankton" & Event == "Night")))
+             (Type == "Zooplankton" & Event == "Night"))&
+           Size != "0.5-1.0 μm")
 # If a sample is missing data it will be removed in this step
 Data.zoops <- na.omit(Data.zoops)
 
@@ -531,7 +535,7 @@ AA_plots
 
 Next, to visualize the between group patterns in the data we will do some multivariate analyses. We'll start by carrying out a PCA. This should give us a decent of idea of what kind of if between-group separation is a major component of variation in this data set. It will also help us visualize which tracers are driving separation between certain organic matter sources and which are providing redundant information.
 
-```{r PCA_sources, dpi=300, fig.asp=0.6, out.width="90%"}
+```{r PCA_sources, dpi=300, fig.asp=0.6, out.width="90%", eval=runMV}
 # Fitting PCA and adding Sample and Type as a supplemental qualitative variable
 PCA = PCA(Data.sources[c(variables,Tracers$mix)], scale.unit = FALSE, quali.sup = variables, graph = FALSE)
 
@@ -550,7 +554,7 @@ fviz_pca_biplot(PCA, axes = c(1,2), # axes tell which components to plot
 
 We'll also try fitting an LDA to see if this is can work as a better tool to visualize our mixing space.
 
-```{r LDA_sources, dpi=300, fig.asp=0.8}
+```{r LDA_sources, dpi=300, fig.asp=0.8, eval=runMV}
 if(runMV == TRUE){
 ntypes = nlevels(as.factor(Data.sources[["Group"]]))
 # fitting the model with leave one out cross validation
@@ -621,7 +625,7 @@ AA_plots
 
 In Order to better visualize the data we've generated in multivariate space we'll fit an LDA to the source data and then plot the zooplankton in that LD space.
 
-```{r LDA_realzoops, dpi=300, fig.asp=0.8}
+```{r LDA_realzoops, dpi=300, fig.asp=0.8, eval=runMV}
 if(runMV == TRUE){
   # poject zooplankton into LD space and predict classification
   pred.zoops = predict(LDA.full, Data.zoops)
@@ -753,7 +757,7 @@ fun_init_1 <- function(i) {
       #                   as.double(TDF_proto[Tracers$frac]-TDF_proto[SDTracers$frac]), 
       #                   as.double(TDF_proto[Tracers$frac]+TDF_proto[SDTracers$frac])),
       pz        = rdirichlet(n=N_Z, rep(1, N_S)), # mixing coefficients can take any starting composition
-      FWL = runif(n=N_Z, 0,5),
+      FWL = runif(n=N_Z, 1,5),
       MTS = runif(n=N_Z, 0,5),
       # sdPTS    = rtgamma(n=N_Z, 0.001, 0.001, 10^-50), # SDPTS gets an inverse gamma
       # sdMTS = rtgamma(n=N_Z, 0.001, 0.001, 10^-50), # SDMTS get and inverse gamma
@@ -765,7 +769,7 @@ fun_init_1 <- function(i) {
     )
   # We define starting values for sources in a separate loop so we can be flexible with the number of sources included in the model
   for (j in 1:N_S) {
-    inits[[means_alpha[j]]] = runif(N_T, 0, 20)
+    inits[[means_alpha[j]]] = runif(N_T, -40, 20)
     inits[[sd_alpha[j]]] = runif(N_T, 0, 2)
   }
   return(inits)
@@ -794,7 +798,7 @@ Now we can run the MCMC!
 
 ```{r runjags, eval=TRUE}
 
-samsPerChain <- 10000 # needed  below for narrative, so we give it a name.
+samsPerChain <- 6000 # needed  below for narrative, so we give it a name.
 monitor_vars = c("mean_A", "sd_A",
                  "mean_B", "sd_B",
                  "mean_C", "sd_C",
@@ -810,9 +814,9 @@ rjo_1 <- # S3 object of class "runjags"
            inits = inits_1,
            silent.jags = FALSE,
            n.chains = Nchains,
-           adapt  = 10000,
-           burnin = 40000,
-           thin = 6,
+           adapt  = 20000,
+           burnin = 10000,
+           thin = 10,
            sample = samsPerChain,
            method = "parallel",
            modules = "glm",
@@ -1362,19 +1366,42 @@ ggarrange(plot.p2p5,
 
 ```{r f-vs-TP, fig.width=8, fig.asp=0.6, dpi=300}
 
-ggplot() +
-  geom_point(aes(y = posts.zoops$f$thin$Surface, x = posts.zoops$trophic$thin$MTS,
-                 color = posts.zoops$f$thin$Size),
-             shape=1, alpha=0.5, size=0.5)+
-  geom_point(aes(y = posts.zoops$f$mode$Surface, x = posts.zoops$trophic$mode$MTS,
-                 fill = posts.zoops$f$mode$Size),
-             shape=21, size=2)+
-  theme(legend.position = "bottom")
+library(effects)
+posts.f.mode <- data.frame(
+  Surface = posts.zoops$f$mode$Surface,
+  FWL = posts.zoops$trophic$mode$FWL,
+  Size = posts.zoops$f$mode$Size
+)
+posts.f.thin <- data.frame(
+  Surface = posts.zoops$f$thin$Surface,
+  FWL = posts.zoops$trophic$thin$FWL,
+  Size = posts.zoops$f$thin$Size
+)
+
+ggplot(data = posts.f.mode) +
+  geom_point(data = posts.f.thin,
+    aes(y = Surface, x = FWL,
+        color = Size),
+    shape=1, alpha=0.5, size=0.5, show.legend = FALSE)+
+  geom_point(
+    aes(y = Surface, x = FWL, 
+        fill = Size),
+    shape=21, size=2)+
+  geom_smooth(aes(y = Surface, x = FWL,
+                  color = Size, fill = Size),
+              method = "glm", method.args = list(family = quasibinomial()))+
+  facet_wrap(~ Size, scales = "free")+
+  theme(legend.position = "right", legend.direction = "vertical")+
+  labs(fill = "Zooplankton Size")+
+  guides(color = FALSE)+
+  xlab("FWL")+
+  ylab("f(surface)")
+  
   
 f_surface <- posts.zoops$f$mode$Surface
 MTS <- posts.zoops$trophic$mode$MTS
 Size <- posts.zoops$trophic$mode$Size
-model <- lm(f_surface ~ MTS + Size)
+model <- glm(f_surface ~ MTS * Size, family = quasibinomial())
 plot(allEffects(mod=model))
 anova(model)
 ```

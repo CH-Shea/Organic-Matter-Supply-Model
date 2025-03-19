@@ -27,7 +27,7 @@ rm(list=ls())
 
 # fresh start? If FALSE (select 2 in hard bracket), will only rerun a chunk if 
 # changes are detected within the text of that chunk.
-rmCache <- c(TRUE, FALSE)[1] 
+rmCache <- c(TRUE, FALSE)[2] 
 tfn <- knitr::current_input()              # name of this file
 tfn <- substr(tfn, 1, nchar(tfn)-4)        # Remove the ".Rmd"
 tfn_cache <- paste0("Caches/", tfn, "_cache")         # Append "_cache" to it
@@ -65,7 +65,8 @@ want <- c("knitr",
           "plotly",
           "gridExtra",
           "graphics",
-          "reshape2")
+          "reshape2"
+          )
 for (pkg in want) shhh(library(pkg, character.only=TRUE))
 
 # set some chunk options
@@ -73,15 +74,16 @@ gr <- (1+sqrt(5))/2 # golden ratio, for figures
 opts_chunk$set(comment="  ",
                fig.asp=0.9/gr,       # <--- gr used here
                fig.align="center",
+               fig.width=5,
+               out.width="95%",
+               dpi=96, # set to 300 for important figures
+               dev="png", # png, svg, pdf, jpg, tiff
                #echo=FALSE,
                cache=c(TRUE, FALSE)[1], 
                cache.path = paste0(tfn_cache,"/"),
                fig.path = paste0(tfn_figures,"/"),
                eval.after="fig.cap", # for dynamic captions
-               collapse=TRUE, 
-               dev="png", # svg, pdf, jpg, tiff
-               fig.width=7.0,
-               out.width="95%"
+               collapse=TRUE
                )
 
 ## defining additional functions we might need
@@ -109,7 +111,7 @@ source("Functions/Post-Mode.R") # contains function post.mode()
 source("Functions/SplitViolin.R") # contains function geom_split_violin()
 # Also loading up some functions we've written for key modelling and simulation tasks
 # source("Functions/OMSM_Gen_Model.R")
-source("Functions/OMSM3_Gen_Model.R")
+source("Functions/OMSM_Gen_Model.R")
 source("Functions/Sim_Zoop.R")
 source("Functions/Sim_Zoop_RealPhe.R")
 source("Functions/OMSM_Global_Extract.R")
@@ -214,27 +216,27 @@ SDTracers$MTS <-
 # Tracers for trophic equations must not be included in this list
 Tracers$mix <-
   c(
-    "d15NAla",
-    "d15NAsx",
-    # "d13CLeu",
-    # "d13CIle",
+    # "d15NAla",
+    # # "d15NAsx",
+    # # "d13CLeu",
+    # # "d13CIle",
     # # "d15NPro",
     "d15NThr",
-    # "d15NSer",
-    # "d15NGly",
+    # # "d15NSer",
+    # # "d15NGly",
     "d15NLys",
     "d15NPhe"
   )
 SDTracers$mix <-
   c(
-    "SDd15NAla",
-    "SDd15NAsx",
-    # "SDd13CLeu",
-    # "SDd13CIle",
-    # "SDd15NPro",
+    # "SDd15NAla",
+    # # "SDd15NAsx",
+    # # "SDd13CLeu",
+    # # "SDd13CIle",
+    # # "SDd15NPro",
     "SDd15NThr",
-    # "SDd15NSer",
-    # "SDd15NGly",
+    # # "SDd15NSer",
+    # # "SDd15NGly",
     "SDd15NLys",
     "SDd15NPhe"
   )
@@ -242,6 +244,7 @@ SDTracers$mix <-
 # Specify the names for all tracers with constant trophic discrimination  and their uncertainty(i.e., TDF(protozoan) = TDF(metazoan))
 Tracers$constTDF <- 
   c(
+    "d15NPhe",
     "d15NAla", 
     "d15NPro", 
     "d15NSer", 
@@ -251,6 +254,7 @@ Tracers$constTDF <-
   )
 SDTracers$constTDF <- 
   c(
+    "SDd15NPhe",
     "SDd15NAla", 
     "SDd15NPro", 
     "SDd15NSer", 
@@ -274,7 +278,7 @@ SDTracers$varTDF <-
 # Specify the names for all conservative tracers and their uncertainty (i.e., no trophic discrimination is expected)
 Tracers$non <- 
   c(
-    "d15NPhe",
+    # "d15NPhe",
     "d13CThr", 
     "d13CVal", 
     "d13CLeu", 
@@ -283,7 +287,7 @@ Tracers$non <-
   )
 SDTracers$non <- 
   c(
-    "SDd15NPhe",
+    # "SDd15NPhe",
     "SDd13CThr", 
     "SDd13CVal", 
     "SDd13CLeu", 
@@ -358,7 +362,7 @@ if(length(Tracers$mix) < 3){
 ## Note that these TDFs should NOT be normalized to any source amino acid.
 TDF_meta <- data.frame("d15NAla" = 6.3, "SDd15NAla" = 2.6,
                        "d15NGly" = 2.9, "SDd15NGly" = 3.1,
-                       "d15NThr" =-4.9, "SDd15NThr" = 3.5,
+                       "d15NThr" =-2.1, "SDd15NThr" = 0.9,
                        "d15NSer" = 2.6, "SDd15NSer" = 3.2,
                        "d15NVal" = 4.4, "SDd15NVal" = 2.6,
                        "d15NLeu" = 5.6, "SDd15NLeu" = 2.4,
@@ -390,13 +394,13 @@ TDF_proto = data.frame("d15NAla" = 6.3, "SDd15NAla" = 2.6,
 
 # Define the Order you would like tracers referenced in, if any
 Order <- c("d15NGlx", "d15NAsx", "d15NAla", "d15NIle", "d15NLeu", "d15NPro", "d15NVal", 
-           "d15NGly", "d15NSer", "d15NPhe", "d15NLys", "d15NThr", "SAA",
+           "d15NGly", "d15NSer", "d15NLys", "d15NPhe", "d15NThr", "SAA",
            "d13CGlx", "d13CAsx", "d13CAla", "d13CIle", "d13CLeu", "d13CPro", "d13CVal", 
-           "d13CGly", "d13CSer", "d13CPhe", "d13CLys", "d13CThr", "EAA")
+           "d13CGly", "d13CSer", "d13CLys", "d13CPhe", "d13CThr", "EAA")
 SDOrder <- c("SDd15NGlx", "SDd15NAsx", "SDd15NAla", "SDd15NIle", "SDd15NLeu", "SDd15NPro", "SDd15NVal", 
-             "SDd15NGly", "SDd15NSer", "SDd15NPhe", "SDd15NLys", "SDd15NThr", "SDSAA",
+             "SDd15NGly", "SDd15NSer", "SDd15NLys", "SDd15NPhe", "SDd15NThr", "SDSAA",
              "SDd13CGlx", "SDd13CAsx", "SDd13CAla", "SDd13CIle", "SDd13CLeu", "SDd13CPro", "SDd13CVal", 
-             "SDd13CGly", "SDd13CSer", "SDd13CPhe", "SDd13CLys", "SDd13CThr", "SDEAA")
+             "SDd13CGly", "SDd13CSer", "SDd13CLys", "SDd13CPhe", "SDd13CThr", "SDEAA")
 # If all tracers used aren't specified in the Order vector then it will be redefined
 if(length(which(Order %in% Tracers$all))<length(Tracers$all)){
   Order <- Tracers$all
@@ -595,11 +599,17 @@ Note that there are two methods for generating mixing parameters describing the 
 
 ```{r SimZoop, eval=TRUE, fig.asp=0.6, out.width="100%", fig.cap=c("Ternary diagram showing the fractional contribution of our three sources (small and large particle and actively transported material) to the base of our simulated zooplankton food web.", "Simulated samples of source material and now zooplankton are plotted with respect to all three tracer $\\dN$ values.", "Simulated samples of source material and now zooplankton are plotted with respect to $\\dNglx$ and $\\dNthr$, both normalized to $\\dNphe$.")}
 
-Sim_Zoop_RealPhe( # use this if treating Phe as a conservative tracer
-# Sim_Zoop(
-    zoops.n = 7,
-    PTS = 1,
-    MTS = 1,
+# source("Functions/Sim_Zoop_RealPhe.R")
+source("Functions/Sim_Zoop.R")
+
+## Sim_Zoop_RealPhe uses 0.3‰ trophic discrimination in Phe to simulate zooplankton
+## data even though the model will assume it is conservative.
+# Sim_Zoop_RealPhe( # use this if treating Phe as a conservative tracer in the model
+Sim_Zoop( # use this if treating Phe as a fractionating tracer in the model
+    zoops.n = 50,
+    incr = 0.2,
+    PTS = c(0,0.5,1),
+    MTS = c(1,1.5,2),
     PTS.sd = 0.5,
     MTS.sd = 0.5,
     TDF_m = TDF_meta[Tracers$frac], # trophic discrimination factors
@@ -611,7 +621,7 @@ Sim_Zoop_RealPhe( # use this if treating Phe as a conservative tracer
     Tracers = Tracers,
     SDTracers = SDTracers,
     variables = variables,
-    Use_Dirichlet = FALSE,
+    Use_Dirichlet = TRUE,
     zoops.f = zoops.f,
     seed = 222
 )
@@ -794,7 +804,7 @@ fun_init_1 <- function(i) {
       #                   as.double(TDF_proto[Tracers$frac]-TDF_proto[SDTracers$frac]), 
       #                   as.double(TDF_proto[Tracers$frac]+TDF_proto[SDTracers$frac])),
       pz        = rdirichlet(n=N_Z, rep(1, N_S)), # mixing coefficients can take any starting composition
-      FWL = runif(n=N_Z, 0,5),
+      FWL = runif(n=N_Z, 1,5),
       MTS = runif(n=N_Z, 0,5),
       # sdPTS    = rtgamma(n=N_Z, 0.001, 0.001, 10^-50), # SDPTS gets an inverse gamma
       # sdMTS = rtgamma(n=N_Z, 0.001, 0.001, 10^-50), # SDMTS get and inverse gamma
@@ -834,7 +844,7 @@ OMSM <- OMSM_Gen_Model(
 Now we can run the MCMC!
 
 ```{r runjags, eval=TRUE}
-samsPerChain <- 10000 # needed  below for narrative, so we give it a name.
+samsPerChain <- 2000 # needed  below for narrative, so we give it a name.
 monitor_vars = c("mean_A", "sd_A",
                  "mean_B", "sd_B",
                  "mean_C", "sd_C",
@@ -851,8 +861,8 @@ rjo_1 <- # S3 object of class "runjags"
            silent.jags = FALSE,
            n.chains = Nchains,
            adapt  = 5000,
-           burnin = 40000,
-           thin = 6,
+           burnin = 10000,
+           thin = 10,
            sample = samsPerChain,
            method = "parallel",
            modules = "glm",
@@ -953,8 +963,10 @@ OMSM_Zoop_Extract(
     Data.zoops = Data.zoops,
     Tracers.all = Tracers$all,
     Tracers.frac = Tracers$frac,
-    Tracers.varTDF = Tracers$varTDF
+    Tracers.varTDF = Tracers$varTDF,
+    combine = c("Surface","Large")
 )
+
 ```
 
 Now let's generate plots of the MCMC posteriors for the zooplankton sample-specific parameters. We'll want to plot the model posteriors for the tracer values at the base of the food web. We'll do this for all the individual tracers, but also try and visualize the multivariate patterns using LDA.Note that all tracers are plotted here, including those that were not used to fit the model, though those are not included in LDAs.
@@ -1018,17 +1030,15 @@ ggplot(data = class.train,
   stat_ellipse(data = class.base.sams,
              aes(x = LD2, y = LD1, color=Group, fill=Group),
              type = 't', alpha = 0.5, size=0.5, geom = "polygon")+
-  # geom_point(data = class.base.sams,
-  #            aes(x = LD2, y = LD1, fill=Group), shape=23, alpha=0.1)+
   geom_point(data = class.base,
              aes(x = LD2, y = LD1, fill=Group, alpha = ""),
-             shape=21, color="black", size=3, stroke=1)+
+             shape=23, color="black", size=3, stroke=1)+
   scale_alpha_manual(values = c(1,1,1,1))+
   geom_point(data = class.base.MCMC,
              aes(x = LD2, y = LD1, fill=Group),
-             size=3.5, shape=23, stroke=1)+
+             size=3.5, shape=21, stroke=1)+
   labs(fill = "Posterior 95% HDI and Mode",
-       color = "Zooplankton Sample",
+       color = "Simulated Zooplankton Sample",
        alpha = "True Value",
        shape = "Organic Matter Source"
        )+
@@ -1065,16 +1075,16 @@ AAplots
 
 We also want to plot comparisons of the trophic parameters used to simulate the zooplankton data and the model posteriors for those parameters.
 
-```{r posterior_trophic_comparison, dpi=300, fig.asp=0.3, fig.width=8.5}
+```{r posterior_trophic_comparison, dpi=300, fig.asp=0.5, fig.width=8.5}
 posts.zoops$trophic$samples$model <- as.factor("vague prior")
 posts.zoops$trophic$samples$Group <- as.factor(posts.zoops$trophic$samples$Group)
 
 plot.FWL <-
   ggplot()+
-  geom_violin(data = posts.zoops$trophic$samples,
-    aes(x=Group, y=FWL, fill=""),
-    alpha=0.4, color="steelblue4", width=1)+
-  scale_fill_manual(values=c("steelblue1","steelblue4"))+
+  # geom_violin(data = posts.zoops$trophic$samples,
+  #   aes(x=Group, y=FWL, fill=""),
+  #   alpha=0.4, color="lightskyblue1", width=1)+
+  # scale_fill_manual(values=c("steelblue1","steelblue4"))+
   geom_line(data = posts.zoops$trophic$HDI95,
             aes(x = Group, y = FWL, group = Group),
             alpha = 0.5, size = 1, color = "steelblue4")+
@@ -1087,20 +1097,28 @@ plot.FWL <-
   geom_line(data = posts.zoops$trophic$HDI50,
             aes(x = Group, y = FWL, group = Group),
             alpha = 1, size = 3, color = "steelblue4")+
-  scale_linetype_manual(values=c(1,1))+
-  geom_hline(
-    aes(yintercept=as.numeric(FWL), color=""),
-    lty=1, size=0.5, alpha=1)+
+  geom_text(data = posts.zoops$trophic$mode,
+            aes(x = Group, y = FWL, group = Group, 
+                label = round(FWL,1)),
+            size = 1.6, color = "lightskyblue1")+
+  scale_linetype_manual(values=c(1,1))+geom_segment(
+    aes(y=zoops.f$FWL, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
+        color=""),
+    lty=1,size=1,alpha=1)+
+  # geom_hline(
+  #   aes(yintercept=as.numeric(FWL), color=""),
+  #   lty=1, size=0.5, alpha=1)+
   scale_color_manual(values=c("goldenrod"))+
   labs(fill="Model Posterior", color="True Value",lty="95% HDI")+
-  xlab("Zooplankton Sample") + ylab("FWL")+
-  coord_cartesian(ylim = c(0,4))
+  xlab("Simulated Zooplankton Sample") + ylab("FWL")+
+  scale_x_continuous(breaks = seq(1,nzoops))+
+  coord_cartesian(ylim = c(0,3), xlim = c(1,nzoops))
 plot.PTS <-
   ggplot()+
-  geom_violin(data = posts.zoops$trophic$samples,
-    aes(x=Group, y=PTS, fill=""),
-    alpha=0.4, color="steelblue4", width=1)+
-  scale_fill_manual(values=c("steelblue1","steelblue4"))+
+  # geom_violin(data = posts.zoops$trophic$samples,
+  #   aes(x=Group, y=PTS, fill=""),
+  #   alpha=0.4, color="lightskyblue1", width=1)+
+  # scale_fill_manual(values=c("steelblue1","steelblue4"))+
   geom_line(data = posts.zoops$trophic$HDI95,
             aes(x = Group, y = PTS, group = Group),
             alpha = 0.5, size = 1, color = "steelblue4")+
@@ -1113,20 +1131,29 @@ plot.PTS <-
   geom_line(data = posts.zoops$trophic$HDI50,
             aes(x = Group, y = PTS, group = Group),
             alpha = 1, size = 3, color = "steelblue4")+
-  scale_linetype_manual(values=c(1,1))+
-  geom_hline(
-    aes(yintercept=as.numeric(PTS), color=""),
-    lty=1, size=0.5, alpha=1)+
+  geom_text(data = posts.zoops$trophic$mode,
+            aes(x = Group, y = PTS, group = Group, 
+                label = round(PTS,1)),
+            size = 1.6, color = "lightskyblue1")+
+  scale_linetype_manual(values=c(1,1))+geom_segment(
+    aes(y=zoops.f$PTS, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
+        color=""),
+    lty=1,size=1,alpha=1)+
+  # geom_hline(
+  #   aes(yintercept=as.numeric(PTS), color=""),
+  #   lty=1, size=0.5, alpha=1)+
   scale_color_manual(values=c("goldenrod"))+
   labs(fill="Model Posterior", color="True Value",lty="95% HDI")+
-  xlab("Zooplankton Sample") + ylab("PTS") + labs(lty="",shape="",color="")+
-  coord_cartesian(ylim = c(0,3))
+  xlab("Simulated Zooplankton Sample") + ylab("PTS") + labs(lty="",shape="",color="")+
+  scale_y_continuous(breaks = c(0,1,2,3,4))+
+  scale_x_continuous(breaks = seq(1,nzoops))+
+  coord_cartesian(ylim = c(0,2), xlim = c(1,nzoops))
 plot.MTS <-
   ggplot()+
-  geom_violin(data = posts.zoops$trophic$samples,
-    aes(x=Group, y=MTS, fill=""),
-    alpha=0.4, color="steelblue4", width=1)+
-  scale_fill_manual(values=c("steelblue1","steelblue4"))+
+  # geom_violin(data = posts.zoops$trophic$samples,
+  #   aes(x=Group, y=MTS, fill=""),
+  #   alpha=0.4, color="lightskyblue1", width=1)+
+  # scale_fill_manual(values=c("steelblue1","steelblue4"))+
   geom_line(data = posts.zoops$trophic$HDI95,
             aes(x = Group, y = MTS, group = Group),
             alpha = 0.5, size = 1, color = "steelblue4")+
@@ -1139,32 +1166,219 @@ plot.MTS <-
   geom_line(data = posts.zoops$trophic$HDI50,
             aes(x = Group, y = MTS, group = Group),
             alpha = 1, size = 3, color = "steelblue4")+
+  geom_text(data = posts.zoops$trophic$mode,
+            aes(x = Group, y = MTS, group = Group, 
+                label = round(MTS,1)),
+            size = 1.6, color = "lightskyblue1")+
   scale_linetype_manual(values=c(1,1))+
-  geom_hline(
-    aes(yintercept=as.numeric(MTS), color=""),
-    lty=1, size=0.5, alpha=1)+
+  geom_segment(
+    aes(y=zoops.f$MTS, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
+        color=""),
+    lty=1,size=1,alpha=1)+
+  # geom_hline(
+  #   aes(yintercept=as.numeric(MTS), color=""),
+  #   lty=1, size=0.5, alpha=1)+
   scale_color_manual(values=c("goldenrod"))+
   labs(fill="Model Posterior", color="True Value",lty="95% HDI")+
-  xlab("Zooplankton Sample") + ylab("MTS") + labs(lty="",shape="",color="")+
-  coord_cartesian(ylim = c(0,3))
+  xlab("Simulated Zooplankton Sample") + ylab("MTS") + labs(lty="",shape="",color="")+
+  scale_y_continuous(breaks = c(0,1,2,3,4))+
+  scale_x_continuous(breaks = seq(1,nzoops))+
+  coord_cartesian(ylim = c(0,2), xlim = c(1,nzoops))
+
+# ggarrange(
+#   ggarrange(
+#     plot.MTS + theme(axis.title.x=element_blank(),axis.text.x=element_blank()),
+#     plot.PTS + theme(axis.title.x=element_blank(),axis.text.x=element_blank()),
+#     nrow=2, heights = c(1,1.1), legend = "none"),
+#   plot.FWL + theme(axis.title.x=element_blank(),axis.text.x=element_blank()),
+#   ncol=2, widths = c(1,1.1), common.legend = TRUE , legend="right")
 
 ggarrange(
-  ggarrange(
-    plot.MTS + theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.y=element_blank()),
-    plot.PTS + theme(axis.title.x=element_blank()),
-    nrow=2, heights = c(1,1.1), legend = "none"),
-  plot.FWL + theme(axis.title.x=element_blank()),
-  ncol=2, widths = c(1,1.1), common.legend = TRUE , legend="right")
+  plot.PTS + no.x.axis,
+  plot.MTS + no.x.axis,
+  plot.FWL,
+  nrow=3, heights = c(2,2,3), common.legend = TRUE , legend="right")
+```
+
+```{r error-quantification-trophic}
+
+data.true <- zoops.f[c("PTS","MTS","FWL")]
+
+data.model <- posts.zoops$trophic$mode[c("PTS","MTS","FWL")]
+
+data.disc <- data.model-data.true
+data.disc$Model <- "OMSM" # posts.zoops.mode$Model
+data.disc$Model <- factor(data.disc$Model, levels = c("OMSM",
+                                                      "MM(Phe,Lys)",
+                                                      "MM(Ser,Gly,Phe,Lys)"))
+
+data.disc.abs <- abs(data.disc[c("PTS","MTS","FWL")])
+data.disc.abs$Model <- data.disc$Model
+
+data.disc.sum <- aggregate(.~Model,
+                            data=data.disc.abs,
+                            FUN=sum)
+data.disc.sum
+
+data.disc.mean <- aggregate(.~Model,
+                            data=data.disc.abs,
+                            FUN=mean)
+data.disc.mean
+
+data.true.long <-
+  melt(
+      data.true,
+      value.name = "true_value",
+      variable.name = "Parameter"
+    )
+data.model.long <- 
+  melt(
+      data.model,
+      value.name = "model_value",
+      variable.name = "Parameter"
+    )
+
+data.truemod.long <-
+  cbind(
+    data.true.long,
+    data.model.long[,"model_value"])
+colnames(data.truemod.long) <-
+  c("parameter","true_value","model_value")
+
+data.truemod.long$disc <-
+  data.truemod.long$model_value -
+  data.truemod.long$true_value
+
+ggplot(data = data.truemod.long)+
+  geom_abline(slope = 1, intercept = 0, size = 1)+
+  geom_point(
+    aes(x = true_value, y = model_value,
+        color = parameter), shape = 1,
+    position = position_dodge(width = 0.2),
+    size = 2
+  )+
+  geom_smooth(
+    aes(x = true_value, y = model_value,
+        color = parameter, fill = parameter),
+    method = "lm"
+    # method = "glm", method.args = list(family = quasibinomial())
+  )+
+  coord_cartesian(expand = FALSE)
+
+ggplot(data = data.truemod.long,)+
+  geom_abline(slope = 0, intercept = 0, size = 1)+
+  geom_point(
+    aes(x = true_value, y = disc,
+        color = parameter, group = parameter),
+    position = position_dodge(width = 0.05),
+    size = 2, stroke=1, shape = 1
+  )+
+  geom_smooth(
+    aes(x = true_value, y = disc,
+        color = parameter, fill = parameter),
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  coord_cartesian(ylim = c(-1,1),expand = FALSE)
+
+plot.TM.FWL <-
+  ggplot(data = subset(data.truemod.long, parameter == "FWL"))+
+  geom_smooth(
+    aes(x = true_value, y = model_value),
+        color = "steelblue4", fill = "steelblue1",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(
+    aes(x = true_value, y = model_value),
+    size = 1, stroke=1, shape = 19, color = "steelblue4"
+  )+
+  geom_abline(slope = 1, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(0,3))
+plot.TM.PTS <-
+  ggplot(data = subset(data.truemod.long, parameter == "PTS"))+
+  geom_smooth(
+    aes(x = true_value, y = model_value),
+        color = "steelblue4", fill = "steelblue1",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(
+    aes(x = true_value, y = model_value),
+    size = 1, stroke=1, shape = 19, color = "steelblue4"
+  )+
+  geom_abline(slope = 1, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(0,1))
+plot.TM.MTS <-
+  ggplot(data = subset(data.truemod.long, parameter == "MTS"))+
+  geom_smooth(
+    aes(x = true_value, y = model_value),
+        color = "steelblue4", fill = "steelblue1",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(
+    aes(x = true_value, y = model_value),
+    size = 1, stroke=1, shape = 19, color = "steelblue4"
+  )+
+  geom_abline(slope = 1, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(0,2))
+
+plot.TM.FWLdisc <-
+  ggplot(data = subset(data.truemod.long, parameter == "FWL"))+
+  geom_smooth(
+    aes(x = true_value, y = disc),
+        color = "steelblue4", fill = "steelblue1",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(
+    aes(x = true_value, y = disc),
+    size = 1, stroke=1, shape = 19, color = "steelblue4"
+  )+
+  geom_abline(slope = 0, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(-1,1))
+plot.TM.PTSdisc <-
+  ggplot(data = subset(data.truemod.long, parameter == "PTS"))+
+  geom_smooth(
+    aes(x = true_value, y = disc),
+        color = "steelblue4", fill = "steelblue1",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(
+    aes(x = true_value, y = disc),
+    size = 1, stroke=1, shape = 19, color = "steelblue4"
+  )+
+  geom_abline(slope = 0, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(-1,1))
+plot.TM.MTSdisc <-
+  ggplot(data = subset(data.truemod.long, parameter == "MTS"))+
+  geom_smooth(
+    aes(x = true_value, y = disc),
+        color = "steelblue4", fill = "steelblue1",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(
+    aes(x = true_value, y = disc),
+    size = 1, stroke=1, shape = 19, color = "steelblue4"
+  )+
+  geom_abline(slope = 0, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(-1,1))
+  
+# plot.TM.PTS
+# plot.TM.MTS
+# plot.TM.FWL
+
 ```
 
 Last we'll do the same for mixing parameters. Here we'll generate simple box plots, but also ternary plots with two of the four organic matter sources pooled on one axis.
 
-```{r posterior_f_ternary, eval=TRUE, dpi=300, fig.asp=0.82, fig.width=8.5}
+```{r posterior_f_ternary, eval=FALSE, dpi=300, fig.asp=0.82, fig.width=8.5}
 
 ## Making ternary plots of mixing parameters
-
-posts.zoops$f$samples$model <- "vague prior"
-posts.zoops$f$samples$Group <- as.character(posts.zoops$f$samples$Group)
+posts.zoops$f$samples$Group <- as.numeric(posts.zoops$f$samples$Group)
 
 ggtern(data = posts.zoops$f$samples,
        aes(x=Surface,
@@ -1172,9 +1386,15 @@ ggtern(data = posts.zoops$f$samples,
            z=Small))+
   # stat_confidence_tern(aes(fill=model), alpha=0.0, size=1,
   #                      breaks=1, geom = "polygon")+
-  stat_confidence_tern(aes(fill=""), color="grey20", alpha=0.4, size=0,
+  stat_confidence_tern(aes(fill="HDI"), color="grey20", alpha=0.4, size=0,
                        breaks=c(0.95,0.9,0.75,0.5), geom = "polygon")+
   scale_fill_manual(values=c("steelblue4","steelblue1"))+
+  geom_point(data = posts.zoops$f$mode, 
+             aes(x=Surface,
+                 y=Large,
+                 z=Small,
+                 fill="Mode"),
+             color="grey10",size=3, stroke=1, shape=21)+
   geom_point(data = zoops.sim, 
              aes(x=Surface,
                  y=Large,
@@ -1182,16 +1402,19 @@ ggtern(data = posts.zoops$f$samples,
                  shape=""),
              color="grey10",size=3, stroke=1, fill="goldenrod")+
   scale_shape_manual(values=c(24))+
-  theme_bw()+
+  theme_bw() + 
+  theme_nomask()+
+  theme_arrowcustomlength(start = c(0.1,0.1,0.1), finish = c(0.9,0.9,0.9))+
   theme(legend.box="vertical",
         legend.position = "right",
         tern.axis.title.T=element_blank(),
         tern.axis.title.L=element_blank(),
         tern.axis.title.R=element_blank())+
-  theme_arrowlarge()+
-  scale_shape_manual(values = c(24))+
   labs(fill="Model Posterior",shape="True Value",color="95% HDI")+
-  facet_wrap(~ Group, nrow = 3)
+  facet_wrap(~Group, nrow = round(sqrt(nrow(zoops.f)),0))+
+  scale_L_continuous(breaks = c(0,1))+
+  scale_R_continuous(breaks = c(0,1))+
+  scale_T_continuous(breaks = c(0,1))
 
 
 
@@ -1205,12 +1428,14 @@ theme_set(theme_classic2()+
 
 nzoops=zoops.n
 
+posts.zoops$f$samples$Group <- as.character(posts.zoops$f$samples$Group)
+
 
 plot.Surface <-
   ggplot()+
-  geom_violin(data = posts.zoops$f$samples,
-    aes(x=as.integer(Group), y=Surface, group = Group, fill=""),
-    alpha=0.4, color="lightskyblue1", width=1)+
+  # geom_violin(data = posts.zoops$f$samples,
+  #   aes(x=Group, y=Surface, group = Group, fill=""),
+  #   alpha=0.4, color="lightskyblue1", width=1)+
   scale_fill_manual(values=c("steelblue1","steelblue4"))+
   geom_line(data = posts.zoops$f$HDI95,
             aes(x = Group, y = Surface, group = Group),
@@ -1224,20 +1449,25 @@ plot.Surface <-
   geom_line(data = posts.zoops$f$HDI50,
             aes(x = Group, y = Surface, group = Group),
             alpha = 1, size = 3, color = "steelblue4")+
+  geom_text(data = posts.zoops$f$mode,
+            aes(x = Group, y = Surface, group = Group, 
+                label = round(Surface*100,0)),
+            size = 1.6, color = "lightskyblue1")+
   geom_segment(
     aes(y=zoops.f$Surface, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
         color=""),
     lty=1,size=0.5,alpha=1)+
   scale_color_manual(values=c("goldenrod"))+
   labs(fill="Model Posterior", color="True Value", lty="95% HDI")+
-  xlab("Zooplankton Sample") + ylab("surface") +
-  scale_x_continuous(breaks = seq(1,N_Z)) + 
-  coord_cartesian(xlim = c(1,N_Z), ylim = c(0,1))
+  xlab("Simulated Zooplankton Sample") + ylab("surface") +
+  scale_y_continuous(breaks = c(0,0.25,0.5,0.75,1), labels = c("0","","0.5","","1.0"))+
+  scale_x_continuous(breaks = seq(1,nzoops))+
+  coord_cartesian(ylim = c(0,1), xlim = c(1,nzoops))
 plot.Large <-
   ggplot()+
-  geom_violin(data = posts.zoops$f$samples,
-    aes(x=as.integer(Group), y=Large, group = Group, fill=""),
-    alpha=0.4, color="lightskyblue1", width=1)+
+  # geom_violin(data = posts.zoops$f$samples,
+  #   aes(x=Group, y=Large, group = Group, fill=""),
+  #   alpha=0.4, color="lightskyblue1", width=1)+
   scale_fill_manual(values=c("steelblue1","steelblue4"))+
   geom_line(data = posts.zoops$f$HDI95,
             aes(x = Group, y = Large, group = Group),
@@ -1251,20 +1481,25 @@ plot.Large <-
   geom_line(data = posts.zoops$f$HDI50,
             aes(x = Group, y = Large, group = Group),
             alpha = 1, size = 3, color = "steelblue4")+
+  geom_text(data = posts.zoops$f$mode,
+            aes(x = Group, y = Large, group = Group, 
+                label = round(Large*100,0)),
+            size = 1.6, color = "lightskyblue1")+
   geom_segment(
     aes(y=zoops.f$Large, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
         color=""),
     lty=1,size=0.5,alpha=1)+
   scale_color_manual(values=c("goldenrod"))+
   labs(fill="Model", color="Actual")+
-  xlab("Zooplankton Sample") + ylab("large") +
-  scale_x_continuous(breaks = seq(1,N_Z)) + 
-  coord_cartesian(xlim = c(1,N_Z), ylim = c(0,1))
+  xlab("Simulated Zooplankton Sample") + ylab("large") +
+  scale_y_continuous(breaks = c(0,0.25,0.5,0.75,1), labels = c("0","","0.5","","1.0"))+
+  scale_x_continuous(breaks = seq(1,nzoops))+
+  coord_cartesian(ylim = c(0,1), xlim = c(1,nzoops))
 plot.Small <-
   ggplot()+
-  geom_violin(data = posts.zoops$f$samples,
-    aes(x=as.integer(Group), y=Small, group = Group, fill=""),
-    alpha=0.4, color="lightskyblue1", width=1)+
+  # geom_violin(data = posts.zoops$f$samples,
+  #   aes(x=Group, y=Small, group = Group, fill=""),
+  #   alpha=0.4, color="lightskyblue1", width=1)+
   scale_fill_manual(values=c("steelblue1","steelblue4"))+
   geom_line(data = posts.zoops$f$HDI95,
             aes(x = Group, y = Small, group = Group),
@@ -1278,47 +1513,349 @@ plot.Small <-
   geom_line(data = posts.zoops$f$HDI50,
             aes(x = Group, y = Small, group = Group),
             alpha = 1, size = 3, color = "steelblue4")+
+  geom_text(data = posts.zoops$f$mode,
+            aes(x = Group, y = Small, group = Group, 
+                label = round(Small*100,0)),
+            size = 1.6, color = "lightskyblue1")+
   geom_segment(
     aes(y=zoops.f$Small, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
         color=""),
     lty=1,size=0.5,alpha=1)+
   scale_color_manual(values=c("goldenrod"))+
   labs(fill="Model", color="Actual")+
-  xlab("Zooplankton Sample") + ylab("small") +
-  scale_x_continuous(breaks = seq(1,N_Z)) + 
-  coord_cartesian(xlim = c(1,N_Z), ylim = c(0,1))
+  xlab("Simulated Zooplankton Sample") + ylab("small") +
+  scale_y_continuous(breaks = c(0,0.25,0.5,0.75,1), labels = c("0","","0.5","","1.0"))+
+  scale_x_continuous(breaks = seq(1,nzoops))+
+  coord_cartesian(ylim = c(0,1), xlim = c(1,nzoops))
+plot.SurfaceLarge <-
+  ggplot()+
+  # geom_violin(data = posts.zoops$f$samples,
+  #   aes(x=Group, y=Surface, group = Group, fill=""),
+  #   alpha=0.4, color="lightskyblue1", width=1)+
+  scale_fill_manual(values=c("steelblue1","steelblue4"))+
+  geom_line(data = posts.zoops$f$HDI95,
+            aes(x = Group, y = SurfaceLarge, group = Group),
+            alpha = 0.5, size = 1, color = "steelblue4")+
+  geom_line(data = posts.zoops$f$HDI90,
+            aes(x = Group, y = SurfaceLarge, group = Group),
+            alpha = 0.7, size = 1.5, color = "steelblue4")+
+  geom_line(data = posts.zoops$f$HDI75,
+            aes(x = Group, y = SurfaceLarge, group = Group),
+            alpha = 0.9, size = 2, color = "steelblue4")+
+  geom_line(data = posts.zoops$f$HDI50,
+            aes(x = Group, y = SurfaceLarge, group = Group),
+            alpha = 1, size = 3, color = "steelblue4")+
+  geom_text(data = posts.zoops$f$mode,
+            aes(x = Group, y = SurfaceLarge, group = Group, 
+                label = round(SurfaceLarge*100,0)),
+            size = 1.6, color = "lightskyblue1")+
+  geom_segment(
+    aes(y=zoops.f$Surface + zoops.f$Large, x=seq(1,nzoops)-0.5, xend=seq(1,nzoops)+0.5,
+        color=""),
+    lty=1,size=0.5,alpha=1)+
+  scale_color_manual(values=c("goldenrod"))+
+  labs(fill="Model Posterior", color="True Value", lty="95% HDI")+
+  xlab("Simulated Zooplankton Sample") + ylab("surface + large") +
+  scale_y_continuous(breaks = c(0,0.25,0.5,0.75,1), labels = c("0","","0.5","","1.0"))+
+  scale_x_continuous(breaks = seq(1,nzoops))+
+  coord_cartesian(ylim = c(0,1), xlim = c(1,nzoops))
 
 
   ggarrange(
     plot.Surface + no.x.axis,
     plot.Large + no.x.axis,
+    plot.Small,
+    nrow = 3, ncol = 1, heights = c(1,1,1.1), legend = "none", common.legend = TRUE)
+  
+  # ggarrange(
+  #   plot.Surface + no.x.axis,
+  #   plot.Large + no.x.axis,
+  #   plot.Small + no.x.axis,
+  #   plot.SurfaceLarge + no.x.axis,
+  #   nrow = 4, ncol = 1, heights = c(1,1,1,1.1), legend = "none", common.legend = TRUE)
+
+```
+
+Finally, we're going to try and quantify model accuracy.
+
+```{r error-quantification-mixing, dpi=300, fig.width=6, fig.asp=0.6}
+
+data.true <- zoops.f[c("Surface","Large","Small")]
+data.true$SurfaceLarge <- zoops.f$Large + zoops.f$Surface
+data.model <- 
+  cbind(
+    posts.zoops$f$mode[c("Surface","Large","Small","SurfaceLarge")]
+  )
+
+data.disc <- data.model-data.true
+data.disc$Model <- "OMSM" # posts.zoops.mode$Model
+data.disc$Model <- factor(data.disc$Model, levels = c("OMSM",
+                                                      "MM(Phe,Lys)",
+                                                      "MM(Ser,Gly,Phe,Lys)"))
+
+data.disc.abs <- abs(data.disc[c("Surface","Large","Small","SurfaceLarge")])
+data.disc.abs$Model <- data.disc$Model
+
+data.disc.sum <- aggregate(.~Model,
+                            data=data.disc.abs,
+                            FUN=sum)
+data.disc.sum
+
+data.disc.mean <- aggregate(.~Model,
+                            data=data.disc.abs,
+                            FUN=mean)
+data.disc.mean
+
+data.model.long <- 
+  melt(data.model[Sources], 
+       value.name = "f_model",
+       variable.name = "Source"
+  )
+data.true.long <- 
+  melt(data.true[Sources], 
+       value.name = "f_true",
+       variable.name = "Source"
+  )
+data.truemod.long <-
+  cbind(
+    data.true.long,
+    data.model.long["f_model"]
+  )
+data.truemod.long$f_disc <-
+  data.truemod.long$f_model -
+  data.truemod.long$f_true
+
+
+ggplot(data = data.truemod.long,)+
+  geom_abline(slope = 1, intercept = 0, size = 1)+
+  geom_point(
+    aes(x = f_true, y = f_model,
+        color = Source, group = Source),
+    position = position_dodge(width = 0.05),
+    size = 2, stroke=1, shape = 1
+  )+
+  geom_smooth(
+    aes(x = f_true, y = f_model,
+        color = Source, fill = Source),
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  coord_cartesian(ylim = c(0,1), expand = FALSE)
+
+ggplot(data = data.truemod.long,)+
+  geom_abline(slope = 0, intercept = 0, size = 1)+
+  geom_point(
+    aes(x = f_true, y = f_disc,
+        color = Source, group = Source),
+    position = position_dodge(width = 0.05),
+    size = 2, stroke=1, shape = 1
+  )+
+  geom_smooth(
+    aes(x = f_true, y = f_disc,
+        color = Source, fill = Source),
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  coord_cartesian(ylim = c(-1,1),expand = FALSE)
+
+plot.TM.surf <-
+  ggplot(data = subset(data.truemod.long, Source == "Surface"))+
+  geom_smooth(
+    aes(x = f_true, y = f_model),
+        color = "steelblue4", fill = "steelblue1",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 19, color = "steelblue4"
+  )+
+  geom_abline(slope = 1, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(0,1))
+plot.TM.large <-
+  ggplot(data = subset(data.truemod.long, Source == "Large"))+
+  geom_smooth(
+    aes(x = f_true, y = f_model),
+        color = "steelblue4", fill = "steelblue1",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 19, color = "steelblue4"
+  )+
+  geom_abline(slope = 1, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(0,1))
+plot.TM.small <-
+  ggplot(data = subset(data.truemod.long, Source == "Small"))+
+  geom_smooth(
+    aes(x = f_true, y = f_model),
+        color = "steelblue4", fill = "steelblue1",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 19, color = "steelblue4"
+  )+
+  geom_abline(slope = 1, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(0,1))
+
+
+plot.TM.surfdisc <-
+  ggplot(data = subset(data.truemod.long, Source == "Surface"))+
+  geom_smooth(
+    aes(x = f_true, y = f_disc),
+        color = "steelblue4", fill = "steelblue1",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 19, color = "steelblue4"
+  )+
+  geom_abline(slope = 0, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(-1,1))
+plot.TM.largedisc <-
+  ggplot(data = subset(data.truemod.long, Source == "Large"))+
+  geom_smooth(
+    aes(x = f_true, y = f_disc),
+        color = "steelblue4", fill = "steelblue1",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 19, color = "steelblue4"
+  )+
+  geom_abline(slope = 0, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(-1,1))
+plot.TM.smalldisc <-
+  ggplot(data = subset(data.truemod.long, Source == "Small"))+
+  geom_smooth(
+    aes(x = f_true, y = f_disc),
+        color = "steelblue4", fill = "steelblue1",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 19, color = "steelblue4"
+  )+
+  geom_abline(slope = 0, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(-1,1))
+```
+
+We'll also draw up a full page figure showing mixing model and trophic parameter posteriors for all samples.
+
+```{r mix-troph-post-summary, fig.width=6.5, fig.asp=1, dpi=300}
+
+ggarrange(
+  
+  ggplot()+
+    ggtitle("Mixing Parameter Posteriors"),
+  
+  ggarrange(
+    plot.Surface + no.x.axis,
+      plot.TM.surf + no.x.axis + no.y.axis,
+    plot.Large + no.x.axis,
+      plot.TM.large + no.x.axis + no.y.axis,
     plot.Small + theme(axis.title.x = element_blank()),
-    nrow = 3, ncol = 1, heights = c(1,1.1), legend = "none", common.legend = TRUE)
+      plot.TM.small + theme(axis.title.x = element_blank()) + no.y.axis,
+    nrow = 3, ncol = 2, heights = c(1,1,1.1), widths = c(4,1), legend = "none"),
+  
+  ggplot()+
+    ggtitle("Trophic Parameter Posteriors"),
+  
+  ggarrange(
+    ggplot()+
+      geom_blank(),
+    ggarrange(
+      plot.PTS + no.x.axis,
+        plot.TM.PTS + no.x.axis + no.y.axis,
+      plot.MTS + no.x.axis,
+        plot.TM.MTS + no.x.axis + no.y.axis,
+      plot.FWL,
+        plot.TM.FWL + no.y.axis + xlab("True Value"),
+      nrow=3, ncol=2, heights = c(2,2,4), widths = c(4,1),
+      legend="none"),
+    ncol = 2, widths = c(0.018,1)
+  ),
+  
+  nrow = 4, heights = c(0.1,1,0.1,1)
+  
+)
 
 ```
 
 The last things we want to do here is export out mixing model results to a viewable table and a .xlsx file.
 
 ```{r f-vs-TP, fig.width=8, fig.asp=0.6, dpi=300}
-library(effects)
+## FWL ##
 ggplot() +
-  geom_point(aes(y = posts.zoops$f$thin$Surface, x = posts.zoops$trophic$thin$MTS,
+  geom_point(aes(x = posts.zoops$f$thin$Surface, y = posts.zoops$trophic$thin$MTS,
                  color = posts.zoops$f$thin$Size),
              shape=1, alpha=0.5, size=0.2)+
-  geom_point(aes(y = posts.zoops$f$mode$Surface, x = posts.zoops$trophic$mode$MTS,
+  geom_point(aes(x = posts.zoops$f$mode$Surface, y = posts.zoops$trophic$mode$MTS,
                  fill = posts.zoops$f$mode$Size),
              shape=21, size=2)+
-  theme(legend.position = "bottom")
+  geom_smooth(aes(x = posts.zoops$f$mode$Surface, y = posts.zoops$trophic$mode$MTS),
+              method = "glm", method.args = list(family = gaussian()))+
+  theme(legend.position = "bottom")+
+  xlab("f(surface)")+
+  ylab("MTS")
   
-f_surface <- posts.zoops$f$mode$Surface
-MTS <- posts.zoops$trophic$mode$MTS
+f_surface.mode <- posts.zoops$f$mode$Surface
+MTS.mode <- posts.zoops$trophic$mode$MTS
 # Size <- posts.zoops$trophic$mode$Size
-model <- lm(f_surface ~ MTS)
-plot(allEffects(mod=model))
+model <- lm(MTS.mode ~ f_surface.mode)
+# plot(allEffects(mod=model))
+anova(model)
+
+## PTS ##
+ggplot() +
+  geom_point(aes(x = posts.zoops$f$thin$Surface, y = posts.zoops$trophic$thin$PTS,
+                 color = posts.zoops$f$thin$Size),
+             shape=1, alpha=0.5, size=0.2)+
+  geom_point(aes(x = posts.zoops$f$mode$Surface, y = posts.zoops$trophic$mode$PTS,
+                 fill = posts.zoops$f$mode$Size),
+             shape=21, size=2)+
+  geom_smooth(aes(x = posts.zoops$f$mode$Surface, y = posts.zoops$trophic$mode$PTS),
+              method = "glm", method.args = list(family = gaussian()))+
+  theme(legend.position = "bottom")+
+  xlab("f(surface)")+
+  ylab("PTS")
+  
+f_surface.mode <- posts.zoops$f$mode$Surface
+PTS.mode <- posts.zoops$trophic$mode$PTS
+# Size <- posts.zoops$trophic$mode$Size
+model <- lm(PTS.mode ~ f_surface.mode)
+# plot(allEffects(mod=model))
+anova(model)
+
+## FWL ##
+ggplot() +
+  geom_point(aes(y = posts.zoops$f$thin$Surface, x = posts.zoops$trophic$thin$FWL),
+             shape=1, alpha=0.5, size=0.2)+
+  geom_point(aes(y = posts.zoops$f$mode$Surface, x = posts.zoops$trophic$mode$FWL,
+                 fill = as.factor(zoops.f$Surface)),
+             shape=21, size=2)+
+  geom_smooth(aes(y = posts.zoops$f$mode$Surface, x = posts.zoops$trophic$mode$FWL,
+                  color = as.factor(zoops.f$Surface), fill = as.factor(zoops.f$Surface)),
+              method = "glm", method.args = list(family = gaussian()))+
+  theme(legend.position = "right")+
+  ylab("f(surface)")+
+  xlab("FWL")
+  
+f_surface.mode <- posts.zoops$f$mode$Surface
+FWL.mode <- posts.zoops$trophic$mode$FWL
+# Size <- posts.zoops$trophic$mode$Size
+model <- glm(f_surface.mode ~ FWL.mode, quasibinomial)
+# plot(allEffects(mod=model))
 anova(model)
 ```
 
-```{r export-results, eval=TRUE}
+```{r export-results, eval=FALSE}
 save(posts.global, posts.global.long, 
      posts.zoops, posts.zoops.long, 
      Data.all, zoops.sim, zoops.f,

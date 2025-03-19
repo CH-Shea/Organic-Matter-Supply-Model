@@ -1,23 +1,24 @@
 # ## Simulating zooplankton data! ##
 Sim_Zoop_RealPhe <- function(
-    zoops.n = 21,
-    incr = 0.2,
-    PTS,
-    MTS,
-    PTS.sd,
-    MTS.sd,
+    zoops.n = 21, # number of zooplankton to simulate
+    incr = 0.2, # increment between zooplankton f values
+    disperse = 0, # number of SDs by which to increase variance of zooplankton data beyond source means
+    PTS, # a vector containing PTS values to simulate
+    MTS, # a vector containing MTS values to simulate
+    PTS.sd, # a vector containing SD of PTS values
+    MTS.sd, # a vector containing SD of PTS values
     TDF_m, # trophic discrimination factors
     TDF_m.sd, # SD of trophic discrimination factors
     TDF_p, # trophic discrimination factors
     TDF_p.sd, # SD of trophic discrimination factors
-    Sources,
-    Data.sources,
-    Tracers,
-    SDTracers,
-    variables,
-    Use_Dirichlet,
-    zoops.f,
-    seed
+    Sources, # names of organic matter sources
+    Data.sources, # data for organic matter sources
+    Tracers, # names of tracers
+    SDTracers, # names of tracer SDs
+    variables, # additional variables to include
+    Use_Dirichlet = TRUE, # should the model usee Dirichlet to simulate zooplankton data?
+    zoops.f, # if no Dirichlet, please supply matrix of f values
+    seed = 222 # option to set seed
 ){
 
 # 
@@ -149,6 +150,13 @@ Sim_Zoop_RealPhe <- function(
     aggregate(Data.sources[Tracers$all], # aggregate source data
               by=list(Group = Data.sources[["Group"]]), # by organic matter source group
               FUN = sd, na.rm=TRUE)[-1] # calculating SD within the population
+  # in real data the zooplankton delta values are often outside of the mean
+  # values in organic matter sources, so we'll increase the variance of our
+  # simulated samples by adding between group variance to the source data.
+  src.mn <- src.mn + 
+    sign((src.mn - matrix(rep(colMeans(src.mn),3), nrow = 3, byrow = TRUE)))*
+    disperse * src.SD
+  
   base.sim <- data.frame(matrix(ncol = length(c("PTS","MTS","FWL",Sources,Tracers$all)), nrow = zoops.n))
   colnames(base.sim) <- c("PTS","MTS","FWL",Sources,Tracers$all)
   base.sim[,variables] <- seq(1,zoops.n) # paste("sim ",seq(1,zoops.n))
@@ -243,6 +251,8 @@ Sim_Zoop_RealPhe <- function(
   Data.zoops <<- Data.zoops
   zoops.sim <<- zoops.sim
   base.sim <<- base.sim
+  src.mn <<- src.mn
+  src.SD <<- src.SD
   zoops.f <<- zoops.f
   zoops.n <<- zoops.n
   mn <<- mn

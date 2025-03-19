@@ -109,12 +109,6 @@ no.y.axis <- theme(axis.title.y=element_blank(),
 source("Functions/calcSDs.R") # contains functions SDmean() and SDsum()
 source("Functions/Post-Mode.R") # contains function post.mode()
 source("Functions/SplitViolin.R") # contains function geom_split_violin()
-# Also loading up some functions we've written for key modelling and simulation tasks
-# source("Functions/OMSM_Gen_Model.R")
-source("Functions/OMSM3_Gen_Model.R")
-source("Functions/Sim_Zoop.R")
-source("Functions/OMSM_Global_Extract.R")
-source("Functions/OMSM_Zoop_Extract.R")
 ```  
 
 <!-- The following commands provide a shorthand for common symbols when used in math mode. -->
@@ -205,8 +199,8 @@ SDtracers_all <- c(SDtracers_d15N,SDtracers_d13C)
 tracers_SAA <- c("d15NSer","d15NGly","d15NLys","d15NPhe")
 SDtracers_SAA <- c("SDd15NSer","SDd15NGly","SDd15NLys","SDd15NPhe")
 
-tracers_select <- c("d15NAla","d15NPhe","d15NThr")
-SDtracers_select <- c("SDd15NAla","SDd15NPhe","SDd15NThr")
+tracers_select <- c("d15NLys","d15NPhe","d15NThr")
+SDtracers_select <- c("Sd15NLys","SDd15NPhe","SDd15NThr")
 
 tracers_complete <- c(tracers_select,"d13CThr","d13CLeu","d13CPhe")
 SDtracers_complete <- c(SDtracers_select,"SDd13CThr","SDd13CLeu","d13CPhe")
@@ -758,7 +752,7 @@ theme_set(theme_light()+
 AA_plots <-
   ggplot(sources.long, aes(x = AA, y = value, color = Group, group=Group))+
   geom_point(alpha=0.6, position = position_dodge(width = 0.8))+
-  ylab(expression(delta^{15}*N*"   or   "*delta^{13}*C*" (\u2030)"))+
+  ylab(expression(delta^{15}*"N (\u2030)"))+
   labs(color="Organic Matter Source", shape="Food Web Base", fill="Zooplankton Samples")+
   facet_row(~iso, scales="free", space="free")+
   geom_vline(xintercept = seq(0.5,length(sources.long$AA),1), color="grey75", lwd=0.3)
@@ -791,6 +785,9 @@ Now we need to assess which of these are correlated and thus may only provide re
 
 corel <- cor(Data.sources[tracers], method = "pearson")
 kable(corel, format = "pipe")
+
+mean(corel[lower.tri(corel)])
+mean(abs(corel[lower.tri(corel)]))
 # mean(abs(cor(Data.sources[tracers_all], method = "spearman")))
 # mean(abs(cor(Data.sources[tracers_complete], method = "spearman")))
 # mean(abs(cor(Data.sources[tracers_select], method = "spearman")))
@@ -798,6 +795,8 @@ kable(corel, format = "pipe")
 
 #create pairs plot
 pairs.panels(Data.sources[tracers], xaxt="n", yaxt="n", lm=TRUE, smoother=FALSE, stars = FALSE, scale=FALSE, ellipses = FALSE, ci=TRUE, method = "pearson")
+
+
 
 ```
 
@@ -1104,7 +1103,7 @@ AA_plots
 ## Principal Components Analysis {-}
 Last we will do a PCA to produce a 2-D visualization of how these groups separate in this multivariate parameter space.
  
-```{r PCA_OSP_select}                       
+```{r PCA_OSP_select, fig.width=7, fig.asp=0.8, dip=300}                       
 # Fitting PCA and adding Type as a supplimental qualitative variable
 PCA.OSP = PCA(Data.sources[c(tracers)], scale.unit = TRUE, graph = FALSE)
 # summary(PCA.lit)
@@ -1546,9 +1545,9 @@ biplot.select <-
   # ggtitle(expression("Select "*delta^{15}*"N"))+
   xlab(paste("PC1(",round(var.exp.PCA[2,2],0),"%)",sep = ""))+
   ylab(paste("PC2(",round(var.exp.PCA[2,3],0),"%)",sep = ""))+
-  theme_light()+theme(text=element_text(family="serif"))+
-  scale_color_manual(values = c("goldenrod2","red2","green3","royalblue1"))+
-  theme(legend.position = 'none')
+  theme_light()+theme(text=element_text(family="serif"))
+  # scale_color_manual(values = c("goldenrod2","red2","green3","royalblue1"))+
+  # theme(legend.position = 'none')
 
 biplot.select
 ```
