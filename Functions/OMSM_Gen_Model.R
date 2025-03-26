@@ -52,11 +52,7 @@ OMSM_Source_Data_and_Priors_2 <-
   
   /* priors for the zooplankton */
     for (iz in 1:N_Z) { # N_Z is the number of zooplankton
-      pz[iz, 1:2] ~ ddirch(c(1,1)) # uniform priors
-      MTS[iz] ~ dunif(0,10) # prior for food web length 
-      sdMTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
-      PTS[iz] ~  dunif(0,10) # prior for protistan trophic steps
-      sdPTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
+      pz[iz, 1:3] ~ ddirch(c(1,1,1)) # uniform priors
     }"
 OMSM_Source_Data_and_Priors_3 <-
   "/* observe tracers in sources */
@@ -112,12 +108,6 @@ OMSM_Source_Data_and_Priors_3 <-
   /* priors for the zooplankton */
     for (iz in 1:N_Z) { # N_Z is the number of zooplankton
       pz[iz, 1:3] ~ ddirch(c(1,1,1)) # uniform priors
-      # FWL[iz] ~ dunif(0,10) # prior for food web length 
-      # sdFWL[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
-      # MTS[iz] ~ dunif(0,10) # prior for food web length 
-      # sdMTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
-      # PTS[iz] ~  dunif(0,10) # prior for protistan trophic steps
-      # sdPTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
     }"
 OMSM_Source_Data_and_Priors_4 <-
   "/* observe tracers in sources */
@@ -182,10 +172,6 @@ OMSM_Source_Data_and_Priors_4 <-
   /* priors for the zooplankton */
     for (iz in 1:N_Z) { # N_Z is the number of zooplankton
       pz[iz, 1:4] ~ ddirch(c(1,1,1,1)) # uniform priors
-      MTS[iz] ~ dunif(0,10) # prior for food web length 
-      sdMTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
-      PTS[iz] ~  dunif(0,10) # prior for protistan trophic steps
-      sdPTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
     }"
 OMSM_Source_Data_and_Priors_5 <-
   "/* observe tracers in sources */
@@ -259,10 +245,6 @@ OMSM_Source_Data_and_Priors_5 <-
   /* priors for the zooplankton */
     for (iz in 1:N_Z) { # N_Z is the number of zooplankton
       pz[iz, 1:5] ~ ddirch(c(1,1,1,1,1)) # uniform priors
-      MTS[iz] ~ dunif(0,10) # prior for food web length
-      sdMTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
-      PTS[iz] ~  dunif(0,10) # prior for protistan trophic steps
-      sdPTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
     }"
 OMSM_Source_Data_and_Priors_6 <-
   "/* observe tracers in sources */
@@ -345,10 +327,6 @@ OMSM_Source_Data_and_Priors_6 <-
   /* priors for the zooplankton */
     for (iz in 1:N_Z) { # N_Z is the number of zooplankton
       pz[iz, 1:6] ~ ddirch(c(1,1,1,1,1,1)) # uniform priors
-      MTS[iz] ~ dunif(0,10) # prior for food web length 
-      sdMTS[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
-      FWL[iz] ~  dunif(0,10) # prior for protistan trophic steps
-      sdFWL[iz] ~ dgamma(0.001, 0.001) T(1*10^-50,) # and its uncertainty
     }"
 
 OMSM_Mixing_2 <-
