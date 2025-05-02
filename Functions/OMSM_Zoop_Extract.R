@@ -64,16 +64,23 @@ temp1<-data.frame(matrix(ncol=length(variables),nrow=nzoops*nsams))
 temp2<-data.frame(matrix(ncol=length(variables),nrow=nzoops*2))
 temp3<-data.frame(matrix(ncol=length(variables),nrow=nzoops))
 colnames(temp1)<-colnames(temp2)<-colnames(temp3)<-variables
+# Setting factor levels
+isfactor <- which(sapply(Data.zoops, class)=="factor")
+for (k in isfactor) {
+  temp1[[k]] <- factor(temp1[[k]], levels = levels(Data.zoops[[k]]))
+  temp2[[k]] <- factor(temp2[[k]], levels = levels(Data.zoops[[k]]))
+  temp3[[k]] <- factor(temp3[[k]], levels = levels(Data.zoops[[k]]))
+}
 # initial columns give info on each zooplankton sample
-# Data.zoops$Size <- factor(Data.zoops$Size, levels = c("0.2-0.5 mm","0.5-1.0 mm","1-2 mm","2-5 mm",">5"))
 for (j in 1:nzoops) {
-  temp1[((j-1)*nsams+1):(nsams*j),] <- Data.zoops[j,variables]
+  temp1[((j-1)*nsams+1):(nsams*j),variables] <- Data.zoops[j,variables]
   temp2[((j-1)*2+1):(2*j),] <- Data.zoops[j,variables]
   temp3[j,] <- Data.zoops[j,variables]
 }
-temp1$Size <- factor(temp1$Size, levels = c("0.2-0.5 mm","0.5-1.0 mm","1-2 mm","2-5 mm",">5 mm"))
-temp2$Size <- factor(temp2$Size, levels = c("0.2-0.5 mm","0.5-1.0 mm","1-2 mm","2-5 mm",">5 mm"))
-temp3$Size <- factor(temp3$Size, levels = c("0.2-0.5 mm","0.5-1.0 mm","1-2 mm","2-5 mm",">5 mm"))
+
+# temp1$Size <- factor(temp1$Size, levels = c("0.2-0.5 mm","0.5-1.0 mm","1-2 mm","2-5 mm",">5 mm"))
+# temp2$Size <- factor(temp2$Size, levels = c("0.2-0.5 mm","0.5-1.0 mm","1-2 mm","2-5 mm",">5 mm"))
+# temp3$Size <- factor(temp3$Size, levels = c("0.2-0.5 mm","0.5-1.0 mm","1-2 mm","2-5 mm",">5 mm"))
 posts.zoops$f$samples <- posts.zoops$trophic$samples <- posts.zoops$base$samples <- posts.zoops$zoop$samples <- temp1
 posts.zoops$f$HDI95 <- posts.zoops$trophic$HDI95 <- posts.zoops$base$HDI95 <- posts.zoops$zoop$HDI95 <-
   posts.zoops$f$HDI90 <- posts.zoops$trophic$HDI90 <- posts.zoops$base$HDI90 <- posts.zoops$zoop$HDI90 <-

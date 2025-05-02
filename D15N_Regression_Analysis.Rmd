@@ -1,0 +1,1944 @@
+---
+title: "Determination of D15N values in wild zooplaknton by regression analysis"
+author: "Connor Shea"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  #html_document: 
+  bookdown::html_document2:  
+    self-contained: yes
+    theme: cerulean #paper #cosmo #journal #readable
+    toc: true
+    smooth_scroll: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    fig_caption: yes
+    code_folding: hide
+link-citations: yes
+---
+
+```{r setup, echo=TRUE, warning=FALSE, message=FALSE, dpi=300}
+## This chunk sets up a working directory, loads packages, defines a couple functions, and sets global chunk options for the .Rmd document
+
+# clean up
+rm(list=ls()) 
+
+# fresh start? If FALSE (select 2 in hard bracket), will only rerun a chunk if 
+# changes are detected within the text of that chunk.
+rmCache <- c(TRUE, FALSE)[1]
+tfn <- knitr::current_input()              # name of this file
+tfn <- substr(tfn, 1, nchar(tfn)-4)        # Remove the ".Rmd"
+tfn_cache <- paste0("Caches/", tfn, "_cache")         # Append "_cache" to it
+tfn_figures <- paste0("Figures/", tfn, "_figures")         # Append "_figures" to it
+if (rmCache) {
+  if (file.exists(tfn_cache))                # If the cache exists...
+    unlink(tfn_cache, recursive=TRUE)        # ...delete it.
+}
+
+# load packages quietly
+shhh <- suppressPackageStartupMessages # It's a library, so shhh!
+want <- c("knitr", 
+          "readxl", # for reading xl files
+          "MASS", # some statistics including lda
+          "vegan", # ecology statistics
+          "FactoMineR", # includes PCA function and utilities
+          "factoextra", # extra utilities for FactoMineR
+          "runjags", # To run Bayesian models
+          "TruncatedDistributions", # To generate truncate porbability distributions
+          "coda",  
+          "DT", # makes nice sortable tables
+          "openxlsx", # writes to .xlsx files
+          "compositions", 
+          "kableExtra",
+          "zeallot", 
+          "magrittr", 
+          "DirichletReg", 
+          "Ternary", 
+          "png",
+          "ggplot2",
+          "ggpubr",
+          "ggstance", # for vertical position dodging
+          "ggtern", # for ternary plots in ggplot2
+          "ggforce", # for specific extra plotting capabilities (facet_row())
+          "plotly",
+          "gridExtra",
+          "graphics",
+          "reshape2",
+          "psych"
+          )
+for (pkg in want) shhh(library(pkg, character.only=TRUE))
+
+# set some chunk options
+gr <- (1+sqrt(5))/2 # golden ratio, for figures
+opts_chunk$set(comment="  ",
+               fig.asp=0.9/gr,       # <--- gr used here
+               fig.align="center",
+               fig.width=5,
+               out.width="95%",
+               dpi=96, # set to 300 for important figures
+               dev="png", # png, svg, pdf, jpg, tiff
+               #echo=FALSE,
+               cache=c(TRUE, FALSE)[1], 
+               cache.path = paste0(tfn_cache,"/"),
+               fig.path = paste0(tfn_figures,"/"),
+               eval.after="fig.cap", # for dynamic captions
+               collapse=TRUE
+               )
+## defining additional functions we might need
+
+## a couple of lines we need to run every time we knit
+# setting the ggplot theme
+theme_set(theme_classic2()+
+            theme(panel.grid.major.x = element_line(colour = "grey95"),
+                  panel.grid.major.y = element_line(colour = "grey95")))
+# defining a ggplot object to remove the x axis
+no.x.axis <- theme(axis.title.x=element_blank(),
+                   axis.text.x=element_blank(),
+                   axis.ticks.x=element_blank())
+# defining a ggplot object to remove the y axis
+no.y.axis <- theme(axis.title.y=element_blank(),
+                   axis.text.y=element_blank(),
+                   axis.ticks.y=element_blank())
+
+# Loading up some functions we might need
+source("Functions/calcSDs.R") # contains functions SDmean() and SDsum()
+source("Functions/Post-Mode.R") # contains function post.mode()
+source("Functions/SplitViolin.R") # contains function geom_split_violin()
+``` 
+
+\newcommand{\um}{\ \mu \mathrm{ m}}
+\newcommand{\mm}{\mathrm{\ mm}}
+\newcommand{\m}{\mathrm{\ m}}
+\newcommand{\N}{\mathrm{^{15}\text{N}}}
+\newcommand{\dN}{\mathrm{\delta^{15}\text{N}}}
+\newcommand{\dNAA}{\mathrm{\delta^{15}\text{N}_\text{AA}}}
+\newcommand{\dNSAA}{\mathrm{\delta^{15}\text{N}_\text{SAA}}}
+\newcommand{\dNTAA}{\mathrm{\delta^{15}\text{N}_\text{TAA}}}
+\newcommand{\dNtr}{\mathrm{\delta^{15}\text{N}_\text{tr}}}
+\newcommand{\dNsrc}{\mathrm{\delta^{15}\text{N}_\text{src}}}
+\newcommand{\dNPhe}{\mathrm{\delta^{15}N_{Phe}}}
+\newcommand{\dNSer}{\mathrm{\delta^{15}N_{Ser}}}
+\newcommand{\dNGly}{\mathrm{\delta^{15}N_{Gly}}}
+\newcommand{\dNLys}{\mathrm{\delta^{15}N_{Lys}}}
+\newcommand{\dNThr}{\mathrm{\delta^{15}N_{Thr}}}
+\newcommand{\dNAla}{\mathrm{\delta^{15}N_{Ala}}}
+\newcommand{\dNGlx}{\mathrm{\delta^{15}N_{Glx}}}
+\newcommand{\dNAsx}{\mathrm{\delta^{15}N_{Asx}}}
+\newcommand{\dNIle}{\mathrm{\delta^{15}N_{Ile}}}
+\newcommand{\dNLeu}{\mathrm{\delta^{15}N_{Leu}}}
+\newcommand{\dNPro}{\mathrm{\delta^{15}N_{Pro}}}
+\newcommand{\dNThrPhe}{\mathrm{\delta^{15}N_{Thr-Phe}}}
+\newcommand{\dNAlaPhe}{\mathrm{\delta^{15}N_{Ala-Phe}}}
+\newcommand{\dNGlxPhe}{\mathrm{\delta^{15}N_{Glx-Phe}}}
+\newcommand{\dNAsxPhe}{\mathrm{\delta^{15}N_{Asx-Phe}}}
+\newcommand{\dNIlePhe}{\mathrm{\delta^{15}N_{Ile-Phe}}}
+\newcommand{\dNLeuPhe}{\mathrm{\delta^{15}N_{Leu-Phe}}}
+\newcommand{\dNProPhe}{\mathrm{\delta^{15}N_{Pro-Phe}}}
+\newcommand{\C}{\mathrm{^{13}\text{C}}}
+\newcommand{\dC}{\mathrm{\delta^{13}\text{C}}}
+\newcommand{\dCAA}{\mathrm{\delta^{13}\text{C}_\text{AA}}}
+\newcommand{\dCEAA}{\mathrm{\delta^{13}\text{C}_\text{EAA}}}
+\newcommand{\dCNAA}{\mathrm{\delta^{13}\text{C}_\text{NAA}}}
+\newcommand{\permil}{‰}
+\newcommand{\degree}{°}
+\newcommand{\TP}{\mathrm{TP}}
+\newcommand{\TPAla}{\mathrm{TP_{Ala-Phe}}}
+\newcommand{\TPGlx}{\mathrm{TP_{Glx-Phe}}}
+\newcommand{\TPts}{\mathrm{TP_{tr-src}}}
+\newcommand{\dTP}{\mathrm{\Delta TP_{Ala-Glx}}}
+
+# Introduction {-}
+
+The following notebook describes linear regression analysis of wild zooplankton AA-CSIA data with the goal of estimating amino acid TDFs. The regressions are constructed as follows:
+
+  1. Zooplankton (0-200 m) and particle (0-100 m) data are aggregated from Station Papa, Station ALOHA, and equatorial sites at 5 N and 8 N.
+  2. Phe-normalized $\dNAA$ values are calculated by subtracting $\dNPhe$ from each $\dNAA$ value.
+  3. Trophic positions are calculated by assuming TDFs and beta values for Phe, Glx, and Phe.
+  4. Phe-normalized $\dNAA$ values are regressed against TP-1.
+  5. The slope of the regression yields the TDF. The slope + TDF(Phe) yields the $\dN$ value.
+  6. Analytical uncertainty is propagated through all equations.
+  
+# Findings {-}
+The below analysis indicates significant relationships between all amino acid $\dN$ values and TP, except for phenylalanine. Notably, the source amino acids Ser, Gly, and Lys all show significant, positive slopes, indicating trophic discrimination occurring in these AAs in wild zooplankton. From the slopes of those regressions we are able to estimate TDFs, which are in general agreement with those determined in controlled feeding studies. TDFs for Ser, Gly, and Lys are 3.7‰, 2.4‰, and 1.2‰, respectively.
+
+Location does not appear to affect these regressions for most amino acids. The exceptions to this are Val and Pro. Given that it is not a significant effect in the vast majority of the regressions, we exclude interactions between location and TP in regressions used to estimate TDFs.
+
+# Setup {-}
+
+Here we will be defining the functions and constants we will need to analyze the data, importing data, and then coercing that data into the different formats we need.
+
+## Defining Functions and Parameters {-}
+
+First and foremost, let's gather the parameters that we know we'll need going forward.
+
+```{r def-params}
+
+
+## Defining some groups of amino acids
+
+# all amino acids
+allAA = c("d15NAla", "d15NGly", "d15NThr", "d15NSer", "d15NVal", "d15NLeu", "d15NIle", "d15NPro", "d15NAsx", "d15NMet", "d15NGlx", "d15NPhe", "d15NTyr", "d15NLys")
+# columns with SD
+SDallAA <- c("SDd15NAla", "SDd15NGly", "SDd15NThr", "SDd15NSer", "SDd15NVal", "SDd15NLeu", "SDd15NIle", "SDd15NPro", "SDd15NAsx", "SDd15NMet", "SDd15NGlx", "SDd15NPhe", "SDd15NTyr", "SDd15NLys")
+# source amino acids
+srcAA = c("d15NGly","d15NSer","d15NPhe","d15NLys") # ALL SRC AA: c("d15NPhe","d15NMet","d15NTyr","d15NGly","d15NSer","d15NLys")
+# columns with SD
+SDsrcAA = c("SDd15NGly","SDd15NSer","SDd15NPhe","SDd15NLys")
+# columns with SD
+SDsrcAA = c("SDd15NGly","SDd15NSer","SDd15NPhe","SDd15NLys")
+# ALL SRC AA: c("SDd15NPhe","SDd15NMet","SDd15NTyr","SDd15NGly","SDd15NSer","SDd15NLys")
+# trophic amino acids
+trAA = c("d15NGlx", "d15NAsx", "d15NAla", "d15NIle", "d15NLeu", "d15NPro", "d15NVal","d15NThr")
+# columns with SD
+SDtrAA = c("SDd15NGlx", "SDd15NAsx", "SDd15NAla", "SDd15NIle", "SDd15NLeu", "SDd15NPro", "SDd15NVal","SDd15NThr")
+# columns with SD
+SDtrAA = c("SDd15NGlx", "SDd15NAsx", "SDd15NAla", "SDd15NIle", "SDd15NLeu", "SDd15NPro", "SDd15NVal","SDd15NThr")
+
+# All amino acids - sorted by SAA TAA and Thr
+allAA.ord <- c("d15NGlx", "SDd15NGlx",	"d15NAla", "SDd15NAla",	"d15NAsx", "SDd15NAsx",	"d15NIle", "SDd15NIle",	"d15NLeu", "SDd15NLeu",	"d15NPro", "SDd15NPro",	"d15NVal", "SDd15NVal",	"d15NSer", "SDd15NSer",	"d15NGly", "SDd15NGly",	"d15NTyr", "SDd15NTyr",	"d15NLys", "SDd15NLys",	"d15NMet", "SDd15NMet",	"d15NPhe", "SDd15NPhe", "d15NThr", "SDd15NThr")
+
+# sometimes will just want the AA names
+allAA.names = c("Ala", "Gly", "Thr", "Ser", "Val", "Leu", "Ile", "Pro", "Asx", "Met", "Glx", "Phe", "Tyr", "Lys")
+SDallAA.names <- c("SDAla", "SDGly", "SDThr", "SDSer", "SDVal", "SDLeu", "SDIle", "SDPro", "SDAsx", "SDMet", "SDGlx", "SDPhe", "SDTyr", "SDLys")
+allAA.ord.names <- c("Glx", "SDGlx",	"Ala", "SDAla",	"Asx", "SDAsx",	"Ile", "SDIle",	"Leu", "SDLeu",	"Pro", "SDPro",	"Val", "SDVal",	"Ser", "SDSer",	"Gly", "SDGly",	"Tyr", "SDTyr",	"Lys", "SDLys",	"Met", "SDMet",	"Phe", "SDPhe", "Thr", "SDThr")
+
+## defining the TDF data from McMahon et al. 2016.
+
+TP.parms = data.frame("AAs"   = c("glx-Phe", "ala-Phe", "thr-Phe", "trp-src"),
+                      "TDF"   = c(7.6      , 5.1      ,-5.8      , 6.3),
+                      "SDTDF" = c(1.2      , 2.1      , 3.2      , 0.9),
+                      "beta"  = c(3.4      , 3.2      ,-2.4      , 2.2),
+                      "SDbeta"= c(0.9      , 1.2      , 0.4      , 0.7)
+                      )
+
+DN.comp <-  data.frame("Ala" = 6.3, "SDAla" = 2.6,
+                       "Gly" = 2.9, "SDGly" = 3.1,
+                       "Thr" =-5.9, "SDThr" = 3.6,
+                       "Ser" = 2.6, "SDSer" = 3.2,
+                       "Val" = 4.4, "SDVal" = 2.6,
+                       "Leu" = 5.6, "SDLeu" = 2.4,
+                       "Ile" = 5.5, "SDIle" = 2.4,
+                       "Pro" = 5.8, "SDPro" = 1.7,
+                       "Asx" = 5.7, "SDAsx" = 1.9,
+                       "Met" = 1.6, "SDMet" = 2.6,
+                       "Glx" = 8.0, "SDGlx" = 1.7,
+                       "Phe" = 0.3, "SDPhe" = 0.5,
+                       "Tyr" = NA , "SDTyr" = NA,
+                       "Lys" = 1.2, "SDLys" = 1.2)
+
+TDF.comp <- DN.comp
+TDF.comp[allAA.names] <- TDF.comp[allAA.names] - DN.comp$Phe
+
+Locs <- c("5N","8N","ALOHA-S","ALOHA-W","OSP")
+```
+
+Next let's define the functions we will need to analyze this data. The most significant of these will definitely be the two-end member mixing model code.
+
+```{r def-funcs}
+
+# defining function to propagate uncertainty for mean calculations
+# defining function to propagate uncertainty for mean calculations
+SDmean <- function(data, na.rm = FALSE)
+{
+  if (prod(!is.na(data)) == 1) {
+    squareds = data^2
+    sumofsquareds = sum(squareds)
+    root = sqrt(sumofsquareds)
+    SD = root/length(as.double(data))
+    return(SD)
+  } else { if (na.rm == TRUE) {
+    data = na.omit(data)
+    squareds = data^2
+    sumofsquareds = sum(squareds)
+    root = sqrt(sumofsquareds)
+    SD = root/length(data)
+    return(SD)
+  } else {
+    return(NA)
+  }
+  }
+}
+
+## defining a function to propagate error through summing calculations
+SDsum <- function(data)
+{
+   if (is.numeric(data) == TRUE) {
+        squareds = data^2
+        sumofsquareds = sum(squareds)
+        root = sqrt(sumofsquareds)
+        SD = root
+        return(SD)
+    } else {
+        return(NA)
+    }
+}
+
+# defining a function to solve a single-tracer, two-source mixing model
+TwoSrcMM <- function(Mix, SDMix, nMix, SrcA, SDSrcA, nSrcA, SrcB, SDSrcB, nSrcB){
+  # Calculating standard errors
+  seMix <- SDMix/sqrt(nMix)
+  seSrcA <- SDSrcA/sqrt(nSrcA)
+  seSrcB <- SDSrcB/sqrt(nSrcB)
+  # Calculating fA and fB
+  fA <- (Mix-SrcB)/(SrcA-SrcB)
+  fB <- (Mix-SrcA)/(SrcB-SrcA)
+  # Calculating vafA and vafB
+  vafA <- (1/(SrcA-SrcB)^2) * (seMix^2 + fA^2*seSrcA^2 + (1-fA)^2*seSrcB^2)
+  vafB <- (1/(SrcB-SrcA)^2) * (seMix^2 + fB^2*seSrcB^2 + (1-fB)^2*seSrcA^2)
+  # Calculating SDfA and SDfB
+  SDfA <- sqrt(vafA)
+  SDfB <- sqrt(vafB)
+  return(data.frame(fA=fA,SDfA=SDfA,fB=fB,SDfB=SDfB))
+}
+
+```
+
+
+## Data Handling {-}
+
+### Importing Data {-}
+
+First we will import all data from 5 N, 8 N, ALOHA-S, ALOHA-W, and OSP. We want this all in one big data frame with columns for descriptive variables, AA $\dN$ values, and the standard deviations for each AA $\dN$ value.
+
+```{r import-data}
+# Importing data from each location
+dN.5N <- as.data.frame(read_excel("Data/AA-CSIA_5N.xlsx", 
+    sheet = "d15N"))
+
+dN.8N <- as.data.frame(read_excel("Data/AA-CSIA_8N.xlsx", 
+    sheet = "d15N"))
+
+dN.ALOHAS <- as.data.frame(read_excel("Data/AA-CSIA_ALOHA_Summer.xlsx", 
+    sheet = "d15N"))
+
+dN.ALOHAW <- as.data.frame(read_excel("Data/AA-CSIA_ALOHA_Winter.xlsx", 
+    sheet = "d15N"))
+
+dN.OSP <- as.data.frame(read_excel("Data/AA-CSIA_OSP.xlsx", 
+    sheet = "d15N"))
+
+# Consolidating into one master data frame
+dN.all <- rbind(dN.5N, dN.8N, dN.ALOHAS, dN.ALOHAW, dN.OSP)
+# ordering "size" factor to be in ascending order
+dN.all$Size = factor(dN.all$Size,
+                             c("0.2-0.7 μm","0.3-1 μm","1-5 μm","1-6 μm","0.7-53 μm","1-53 μm","6-51 μm",">51 μm",">53 μm","0.06-0.2 mm","0.2-0.5 mm", "0.5-1.0 mm", "1-2 mm", "2-5 mm", ">5 mm"))
+# # Making group = Zooplankton for all zooplankton
+# dN.all$Group[dN.all$Type=="Zooplankton"] = "Zooplankton"
+# Prioritizing Group to be first
+dN.all <- 
+  cbind(
+    dN.all[,
+           c("Group","Type","Sizecat","Size","Depth","Event","Tow","Epoch","Location")],
+    dN.all[allAA.ord])
+
+data.romero <- as.data.frame(read_excel("~/University_of_Hawaii/SIA_work/EXPORTS/Data/Literature/Romero-Romero2020.xlsx"))
+```
+
+### Calculating TP {-}
+
+Next we will be calculating **Trophic position (TP)** via the equation:
+$$
+\mathrm{
+TP = \frac{\delta^{15}N_{trp} - \delta^{15}N_{src} - \beta_{trp-src}}{TDF_{trp-src}}
+}
+$$
+
+To assess error in TP we will use the equation from Bradley et al. 2015:
+
+\begin{align}
+\sigma^2_{TP} &= \left( \frac{\partial~TP}{\partial~\delta^{15}N_{trp}} \right)^2 \sigma^2_{\delta^{15}N_{trp}} +
+                 \left( \frac{\partial~TP}{\partial~\delta^{15}N_{src}} \right)^2 \sigma^2_{\delta^{15}N_{src}} +
+                 \left( \frac{\partial~TP}{\partial~\beta_{trp-src}} \right)^2 \sigma^2_{\beta_{trp-src}} +
+                 \left( \frac{\partial~TP}{\partial~TDF_{trp-src}} \right)^2 \sigma^2_{TDF_{trp-src}} \\
+              &= \left( \frac{\sigma_{\delta^{15}N_{trp}}}{TDF_{trp-src}} \right)^2 +
+                 \left( \frac{\sigma_{\delta^{15}N_{src}}}{TDF_{trp-src}} \right)^2 +
+                 \left( \frac{\sigma_{\beta_{trp-src}}}{TDF_{trp-src}} \right)^2 +
+                 \left( \frac{\delta^{15}N_{src} + \beta_{trp-src} - \delta^{15}N_{trp}}{TDF_{trp-src}^2} \right)^2\sigma^2_{TDF_{trp-src}}
+\end{align}
+
+```{r Derive-Params}
+data.all <- dN.all
+# Calculating TP_Glx-Phe with SD
+data.all$TPGlx <- (data.all$d15NGlx - data.all$d15NPhe - TP.parms$beta[1])/TP.parms$TDF[1]+1
+data.all$SDTPGlx <- (data.all$SDd15NGlx/TP.parms$TDF[1])^2+
+  (data.all$SDd15NPhe/TP.parms$TDF[1])^2+
+  (TP.parms$SDbeta[1]/TP.parms$TDF[1])^2+
+  ((data.all$d15NPhe + TP.parms$beta[1] - data.all$d15NGlx)/
+     TP.parms$TDF[1]^2)^2 * TP.parms$SDTDF[1]^2
+
+# Calculating TP_Ala-Phe with SD
+data.all$TPAla <- (data.all$d15NAla - data.all$d15NPhe - TP.parms$beta[2])/TP.parms$TDF[2]+1
+data.all$SDTPAla <- (data.all$SDd15NAla/TP.parms$TDF[2])^2+
+  (data.all$SDd15NPhe/TP.parms$TDF[2])^2+
+  (TP.parms$SDbeta[2]/TP.parms$TDF[2])^2+
+  ((data.all$d15NPhe + TP.parms$beta[2] - data.all$d15NAla)/
+     TP.parms$TDF[2]^2)^2 * TP.parms$SDTDF[2]^2
+```
+
+### Subsetting the Data {-}
+
+We will subset the data just to try and capture the surface food web. We will include particles above 100 m and zooplankton above 200 m.
+
+```{r data-selection-reg}
+data.all.phenorm <- data.all
+data.all.phenorm[allAA] <- data.all[allAA] - data.all$d15NPhe
+data.all.phenorm[SDallAA] <-SDsum(c(data.all[SDallAA], data.all$d15NPhe))
+
+data.reg <- subset(data.all, (Type == "Zooplankton" & Depth < 200) | (Type == "Particle" & Depth < 100))
+data.reg.phenorm <- subset(data.all.phenorm, (Type == "Zooplankton" & Depth < 200) | (Type == "Particle" & Depth < 100))
+
+# data.reg.phenorm <- subset(data.all.phenorm, Type == "Zooplankton" |
+#                                      (Type == "Particle" & Depth <= 100))
+
+```
+
+# Estimating $\Delta^{15}N$ values for all AAs from regression analysis {-}
+
+To calculate $\Delta^{15}N$ values we will regress $\delta^{15}N_{AA-Phe}$ against $\delta^{15}N_{Glx/Ala-Phe}$. The regression can thus be described by the equation:
+\begin{align}
+\delta^{15}N_{AA-Phe} = m \cdot \delta^{15}N_{Glx/Ala-Phe} + b
+\end{align}
+An equation for the slope can thus be written as:
+\begin{align}
+m = \frac{TDF_{AA-Phe}}{TDF_{Glx/Ala-Phe}}
+  = \frac{\Delta^{15}N_{AA} - \Delta^{15}N_{Phe}}{TDF_{Glx/Ala-Phe}}
+\end{align}
+We can then solve for $\Delta^{15}N_{AA}$, yielding the equaion:
+\begin{align}
+\Delta^{15}N_{AA} = m \cdot TDF_{Glx/Ala-Phe} + \Delta^{15}N_{Phe}
+\end{align}
+
+Propagation of uncertainty through this equation is then takes the form:
+\begin{align}
+\sigma(\Delta^{15}N_{AA})^2 =& \sigma(m \cdot TDF_{Glx/Ala-Phe})^2 + \sigma(\Delta^{15}N_{Phe})^2 \\
+                            =& m^2 \cdot TDF_{Glx/Ala-Phe}^2 
+                                   \left[\left(\frac{\sigma(m)}{m}\right)^2 + 
+                                   \left(\frac{\sigma(TDF_{Glx/Ala-Phe})}{TDF_{Glx/Ala-Phe}}\right)^2\right] +
+                            \sigma(\Delta^{15}N_{Phe})^2 \\
+                            =& \left(TDF_{Glx/Ala-Phe} \cdot \sigma(m)\right)^2 +
+                               \left(m \cdot \sigma(TDF_{Glx/Ala-Phe})\right)^2 +
+                               \sigma(\Delta^{15}N_{Phe})^2
+\end{align}
+or
+\begin{align}
+\sigma(\Delta^{15}N_{AA}) = \sqrt{
+                                  \left(TDF_{Glx/Ala-Phe} \cdot \sigma(m)\right)^2 +
+                                  \left(m \cdot \sigma(TDF_{Glx/Ala-Phe})\right)^2 +
+                                  \sigma(\Delta^{15}N_{Phe})^2
+}
+\end{align}
+
+We will go ahead and calculate TDFs in that manner and present the results in a data table.
+
+```{r estimating-D15Ns}
+
+DN_Glx <- DN.comp$Glx
+SDDN_Glx <- DN.comp$SDGlx
+DN_Ala <-  DN.comp$Ala
+SDDN_Ala <-  DN.comp$SDAla
+DN_Phe <- DN.comp$Phe
+SDDN_Phe <-  DN.comp$SDPhe
+DN_GA <- c(DN.comp$Glx,DN.comp$Ala)
+SDDN_GA <- c(DN.comp$SDGlx,DN.comp$SDAla)
+TDF_GA <- c(TDF.comp$Glx,TDF.comp$Ala)
+SDTDF_GA <- c(TDF.comp$SDGlx,TDF.comp$SDAla)
+
+DN.reg = data.frame(Ala=c(NA,NA))
+## Ala 
+LM <- lm(d15NAla ~ d15NGlx + Location, data = data.reg.phenorm)
+out1 <- summary(LM)
+anova(LM)
+# LM <- lm(d15NAla ~ d15NAla + Location, data = data.reg.phenorm)
+# out2 <- summary(LM)
+m_reg <- c(out1$coefficients[2,1],NA)
+SDm_reg <- c(out1$coefficients[2,2],NA)
+
+DN.reg$Ala <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDAla <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+## Gly 
+LM <- lm(d15NGly ~ d15NGlx + Location, data = data.reg.phenorm)
+out1 <- summary(LM)
+anova(LM)
+LM <- lm(d15NGly ~ d15NAla + Location, data = data.reg.phenorm)
+out2 <- summary(LM)
+anova(LM)
+m_reg <- c(out1$coefficients[2,1],out2$coefficients[2,1])
+SDm_reg <- c(out1$coefficients[2,2],out2$coefficients[2,2])
+
+DN.reg$Gly <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDGly <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+## Thr 
+LM <- lm(d15NThr ~ d15NGlx + Location, data = data.reg.phenorm)
+out1 <- summary(LM)
+anova(LM)
+LM <- lm(d15NThr ~ d15NAla + Location, data = data.reg.phenorm)
+out2 <- summary(LM)
+anova(LM)
+m_reg <- c(out1$coefficients[2,1],out2$coefficients[2,1])
+SDm_reg <- c(out1$coefficients[2,2],out2$coefficients[2,2])
+
+DN.reg$Thr <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDThr <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+## Ser 
+LM <- lm(d15NSer ~ d15NGlx + Location, data = data.reg.phenorm)
+out1 <- summary(LM)
+anova(LM)
+LM <- lm(d15NSer ~ d15NAla + Location, data = data.reg.phenorm)
+out2 <- summary(LM)
+anova(LM)
+m_reg <- c(out1$coefficients[2,1],out2$coefficients[2,1])
+SDm_reg <- c(out1$coefficients[2,2],out2$coefficients[2,2])
+
+DN.reg$Ser <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDSer <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+## Val 
+LM <- lm(d15NVal ~ d15NGlx + Location, data = data.reg.phenorm)
+out1 <- summary(LM)
+anova(LM)
+LM <- lm(d15NVal ~ d15NAla + Location, data = data.reg.phenorm)
+out2 <- summary(LM)
+anova(LM)
+m_reg <- c(out1$coefficients[2,1],out2$coefficients[2,1])
+SDm_reg <- c(out1$coefficients[2,2],out2$coefficients[2,2])
+
+DN.reg$Val <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDVal <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+## Leu 
+LM <- lm(d15NLeu ~ d15NGlx + Location, data = data.reg.phenorm)
+out1 <- summary(LM)
+anova(LM)
+LM <- lm(d15NLeu ~ d15NAla + Location, data = data.reg.phenorm)
+out2 <- summary(LM)
+anova(LM)
+m_reg <- c(out1$coefficients[2,1],out2$coefficients[2,1])
+SDm_reg <- c(out1$coefficients[2,2],out2$coefficients[2,2])
+
+DN.reg$Leu <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDLeu <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+## Ile 
+LM <- lm(d15NIle ~ d15NGlx + Location, data = data.reg.phenorm)
+out1 <- summary(LM)
+anova(LM)
+LM <- lm(d15NIle ~ d15NAla + Location, data = data.reg.phenorm)
+out2 <- summary(LM)
+anova(LM)
+m_reg <- c(out1$coefficients[2,1],out2$coefficients[2,1])
+SDm_reg <- c(out1$coefficients[2,2],out2$coefficients[2,2])
+
+DN.reg$Ile <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDIle <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+## Pro 
+LM <- lm(d15NPro ~ d15NGlx + Location, data = data.reg.phenorm)
+out1 <- summary(LM)
+anova(LM)
+LM <- lm(d15NPro ~ d15NAla + Location, data = data.reg.phenorm)
+out2 <- summary(LM)
+anova(LM)
+m_reg <- c(out1$coefficients[2,1],out2$coefficients[2,1])
+SDm_reg <- c(out1$coefficients[2,2],out2$coefficients[2,2])
+
+DN.reg$Pro <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDPro <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+## Asx 
+LM <- lm(d15NAsx ~ d15NGlx + Location, data = data.reg.phenorm)
+out1 <- summary(LM)
+anova(LM)
+LM <- lm(d15NAsx ~ d15NAla + Location, data = data.reg.phenorm)
+out2 <- summary(LM)
+anova(LM)
+m_reg <- c(out1$coefficients[2,1],out2$coefficients[2,1])
+SDm_reg <- c(out1$coefficients[2,2],out2$coefficients[2,2])
+
+DN.reg$Asx <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDAsx <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+## Met -- SKIP
+# LM <- lm(d15NMet ~ d15NGlx + Location, data = data.reg.phenorm)
+# out1 <- summary(LM)
+# LM <- lm(d15NMet ~ d15NAla + Location, data = data.reg.phenorm)
+# out2 <- summary(LM)
+m_reg <- c(NA,NA)
+SDm_reg <- c(NA,NA)
+
+DN.reg$Met <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDMet <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+## Glx
+# LM <- lm(d15NGlx ~ d15NGlx + Location, data = data.reg.phenorm)
+# out1 <- summary(LM)
+LM <- lm(d15NGlx ~ d15NAla + Location, data = data.reg.phenorm)
+out2 <- summary(LM)
+anova(LM)
+m_reg <- c(NA,out2$coefficients[2,1])
+SDm_reg <- c(NA,out2$coefficients[2,2])
+
+DN.reg$Glx <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDGlx <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+## Phe -- SKIP
+# LM <- lm(d15NPhe ~ d15NGlx + Location, data = subset(data.all, Depth <= 100))
+# out1 <- summary(LM)
+# anova(LM)
+# LM <- lm(d15NPhe ~ d15NAla + Location, data = subset(data.all, Depth <= 100))
+# out2 <- summary(LM)
+anova(LM)
+m_reg <- c(NA,NA)
+SDm_reg <- c(NA,NA)
+
+DN.reg$Phe <- m_reg
+DN.reg$SDPhe <- SDm_reg
+
+## Tyr
+LM <- lm(d15NTyr ~ d15NGlx + Location, data = data.reg.phenorm)
+out1 <- summary(LM)
+anova(LM)
+LM <- lm(d15NTyr ~ d15NAla + Location, data = data.reg.phenorm)
+out2 <- summary(LM)
+anova(LM)
+m_reg <- c(out1$coefficients[2,1],out2$coefficients[2,1])
+SDm_reg <- c(out1$coefficients[2,2],out2$coefficients[2,2])
+
+DN.reg$Tyr <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDTyr <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+## Lys
+LM <- lm(d15NLys ~ d15NGlx + Location, data = data.reg.phenorm)
+out1 <- summary(LM)
+anova(LM)
+LM <- lm(d15NLys ~ d15NAla + Location, data = data.reg.phenorm)
+out2 <- summary(LM)
+anova(LM)
+m_reg <- c(out1$coefficients[2,1],out2$coefficients[2,1])
+SDm_reg <- c(out1$coefficients[2,2],out2$coefficients[2,2])
+
+DN.reg$Lys <- m_reg*TDF_GA + DN_Phe
+DN.reg$SDLys <- sqrt((TDF_GA * SDm_reg)^2 + (m_reg * SDTDF_GA)^2 + DN.comp$Phe^2)
+
+
+DN.compare <- round(rbind(DN.reg,DN.comp),2)
+DN.compare <- cbind(Method = c("Regression vs TP(Glx-Phe)","Regression vs TP(Ala-Phe)","Feeding Study"),
+                     DN.compare)
+datatable(DN.compare)
+
+write.xlsx(DN.compare, "~/University_of_Hawaii/SIA_work/EXPORTS/Data/FWM-results/DNs_regression-analysis.xlsx", overwrite=TRUE)
+```
+
+Now, we'll try and summarize these DN comparisons in a nice figure.
+
+```{r D15N-figure, dpi=300, fig.width=6, fig.asp=0.5}
+# DN.compare.long$Alpha <- 1
+
+DN.compare.long <- melt(DN.compare[1:3,c("Method",allAA.names)],
+                         id.vars = c("Method"), variable.name = "AA")
+DN.compare.long.SD <- melt(DN.compare[1:3,c("Method",SDallAA.names)],
+                         id.vars = c("Method"), variable.name = "AA")
+DN.compare.long$SD <- DN.compare.long.SD$value
+DN.compare.long$AA <- factor(DN.compare.long$AA, levels = allAA.ord.names)
+
+DN.compare.long$Alpha <- 0.5
+AA.constTDF <- 
+  c("Phe", "Ala", "Pro", "Ser", "Gly", "Lys")
+AA.varTDF <- 
+  c("Glx", "Asx", "Leu", "Thr")
+DN.compare.long$Alpha[
+  which(DN.compare.long$AA %in% AA.constTDF & 
+        DN.compare.long$Method == "Regression vs TP(Ala-Phe)")
+] <- 1
+DN.compare.long$Alpha[
+  which(DN.compare.long$AA %in% AA.varTDF & 
+        DN.compare.long$Method == "Regression vs TP(Glx-Phe)")
+] <- 1
+DN.compare.long$Alpha[
+  which(DN.compare.long$Method == "Feeding Study")
+] <- 1
+
+labs <-  c(
+  "Feeding Study",
+  expression("Regression vs "*delta^{15}*"N"[Ala-Phe]),
+  expression("Regression vs "*delta^{15}*"N"[Glx-Phe])
+)
+ggplot(data = DN.compare.long,
+       aes(x = AA, y = value, 
+           ymax = value+SD, ymin = value-SD,
+           color = Method, shape = Method,
+           alpha = Alpha))+
+  geom_hline(yintercept=0, alpha=0.5)+
+  geom_point(position = position_dodge(width = 0.5))+
+  geom_errorbar(width=0.2, position = position_dodge(width = 0.5))+
+  scale_alpha_continuous(range = c(0.2,1))+
+  ylab(expression(Delta^{15}*"N"[AA]*"(‰)") )+
+  labs(color="",shape="")+guides(alpha="none")+
+  scale_color_discrete(labels = labs)+
+  scale_shape_discrete(labels = labs)+
+  theme_light()+
+  theme(legend.position="bottom",axis.title.x=element_blank())
+
+```
+
+# Plots and Statistics {-}
+
+We're also going to generate plots visualizing regressions for each amino acid against TP. We will prot regressings against TP(Ala-Phe) and TP(Glx-Phe).
+
+We'll also run some statistical tests.
+
+  1. Does location have an effect on the slope of the regression?
+  2. Assuming no, is the slope significant?
+  3. What is 3. The $R^2$ value associated with the regression?
+
+## Regression for Ala {-}
+
+```{r Ala}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Ala-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NAla ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5]
+p1 <- anova(LM.dN)[1,5]
+
+noquote("Regressing d15N(Ala-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NAla ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5]
+R2 <- summary(LM.dN)$adj.r.squared
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Ala-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NAla ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5]
+R3 <- summary(LM.dN)$adj.r.squared
+
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NAla))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Ala-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Ala-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NAla ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5]
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NAla))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Ala-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NAla"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Gly {-}
+
+```{r Gly}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Gly-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NGly ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Gly-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NGly ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Gly-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NGly ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NGly))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Gly-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Gly-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NGly ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NGly))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Gly-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NGly"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Thr {-}
+
+```{r Thr}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Thr-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NThr ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Thr-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NThr ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Thr-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NThr ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NThr))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Thr-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Thr-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NThr ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NThr))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Thr-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NThr"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Ser {-}
+
+```{r Ser}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Ser-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NSer ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Ser-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NSer ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Ser-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NSer ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NSer))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Ser-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Ser-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NSer ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NSer))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Ser-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NSer"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Val {-}
+
+```{r Val}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Val-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NVal ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Val-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NVal ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Val-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NVal ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NVal))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Val-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Val-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NVal ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NVal))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Val-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NVal"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {if(p3 < 0.05 & p4 < 0.05) {noquote("IS")} else {"MIGHT BE"}} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Leu {-}
+
+```{r Leu}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Leu-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NLeu ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Leu-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NLeu ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Leu-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NLeu ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NLeu))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Leu-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Leu-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NLeu ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NLeu))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Leu-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NLeu"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Ile {-}
+
+```{r Ile}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Ile-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NIle ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Ile-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NIle ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Ile-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NIle ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NIle))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Ile-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Ile-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NIle ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NIle))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Ile-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NIle"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Pro {-}
+
+```{r Pro}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Pro-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NPro ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Pro-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NPro ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Pro-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NPro ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NPro))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Pro-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Pro-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NPro ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NPro))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Pro-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NPro"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Asx {-}
+
+```{r Asx}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Asx-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NAsx ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Asx-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NAsx ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Asx-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NAsx ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NAsx))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Asx-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Asx-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NAsx ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NAsx))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Asx-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NAsx"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Met {-}
+
+```{r Met}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Met-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NMet ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Met-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NMet ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Met-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NMet ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NMet))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Met-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Met-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NMet ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NMet))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Met-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NMet"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Glx {-}
+
+```{r Glx}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Glx-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NGlx ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Glx-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NGlx ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Glx-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NGlx ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NGlx))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Glx-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Glx-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NGlx ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NGlx))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Glx-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NGlx"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Phe {-}
+
+We note that for Phe we can obviously not normalize to Phe, so we are regressing the raw value.
+
+```{r Phe, eval=TRUE}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NPhe ~ (TPGlx-1) * Location, data = data.reg)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NPhe ~ (TPAla-1) * Location, data = data.reg)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NPhe ~ (TPGlx-1) + Location, data = data.reg)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg, aes(x = (TPGlx-1), y = d15NPhe))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NPhe ~ (TPAla-1) + Location, data = data.reg)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg, aes(x = (TPAla-1), y = d15NPhe))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NPhe"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Tyr {-}
+
+```{r Tyr}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Tyr-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NTyr ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Tyr-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NTyr ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Tyr-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NTyr ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NTyr))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Tyr-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Tyr-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NTyr ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NTyr))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Tyr-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NTyr"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
+
+## Regression for Lys {-}
+
+```{r Lys}
+
+noquote("Checking to see if location affects the slope of the regression...")
+
+noquote("Regressing d15N(Lys-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NLys ~ (TPGlx-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p1 <- anova(LM.dN)[3,5] 
+R1 <- summary(LM.dN)$adj.r.squared
+
+noquote("Regressing d15N(Lys-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NLys ~ (TPAla-1) * Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1],
+  LM.dN$coefficients[1] + LM.dN$coefficients[7],
+  LM.dN$coefficients[1] + LM.dN$coefficients[8],
+  LM.dN$coefficients[1] + LM.dN$coefficients[9],
+  LM.dN$coefficients[1] + LM.dN$coefficients[10]
+)
+p2 <- anova(LM.dN)[3,5] 
+R2 <- summary(LM.dN)$adj.r.squared
+
+
+noquote("Now re-running the regression without location interaction")
+
+noquote("Regressing d15N(Lys-Phe) against TP(Glx-Phe)")
+LM.dN = lm(d15NLys ~ (TPGlx-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.1 <- c(
+  LM.dN$coefficients[1]
+)
+p3 <- anova(LM.dN)[1,5] 
+R3 <- summary(LM.dN)$adj.r.squared
+
+
+
+ggplot(data = data.reg.phenorm, aes(x = (TPGlx-1), y = d15NLys))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Glx-Phe]-1))+
+  ylab(expression(delta^{15}*N[Lys-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+noquote("Regressing d15N(Lys-Phe) against TP(Ala-Phe)")
+LM.dN = lm(d15NLys ~ (TPAla-1) + Location, data = data.reg.phenorm)
+summary(LM.dN)
+anova(LM.dN)
+coef.2 <- c(
+  LM.dN$coefficients[1]
+)
+p4 <- anova(LM.dN)[1,5] 
+R4 <- summary(LM.dN)$adj.r.squared
+
+ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NLys))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, aes(y = predict(LM.dN, data.reg.phenorm), color=Location), lty=1, se=TRUE)+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Lys-Phe]*" (\u2030)"))+
+  theme_light()+
+  facet_wrap(~ Location)
+
+DN.reg <- data.frame(
+  "TP(Glx-Phe)" = coef.1,
+  "TP(Ala-Phe)" = coef.2,
+  row.names = "d15NLys"
+)
+
+DN.reg
+
+```
+
+1. We tested to see if location had a significant effect on the slope of the regression. The P values associated with this test were `r p1 ` and `r p2 ` for TP(Glx-Phe) and TP(Ala-Phe), respectively. This indicates that location `r if(p1 < 0.05 | p2 < 0.05) {if(p1 < 0.05 & p2 < 0.05) {noquote("DOES")} else {"MIGHT"}} else {"DOES NOT"}` have a significant effect on the slope of the regression.
+
+2. Removing the interaction with location, we tested to see if the slope is significant. The P value associated with these tests were `r p3 ` and `r p4 `. This indicates that the slope of the regression `r if(p3 < 0.05 | p4 < 0.05) {noquote("IS")} else {"IS NOT"}` significant.
+
+3. The $R^2$ values were `r R3` and `r R4`, respectively.
