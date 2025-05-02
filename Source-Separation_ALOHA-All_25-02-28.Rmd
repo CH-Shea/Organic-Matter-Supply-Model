@@ -147,14 +147,12 @@ source("Functions/estimate.ED.R") # contains funcion estimate.ED()
 \newcommand{\TPts}{\mathrm{TP_{tr-src}}}
 \newcommand{\dTP}{\mathrm{\Delta TP_{ala-glx}}}
 
-The goal of this document is to assess the separation of different possible sources of organic matter in isotope space, as well as to filter out the samples that are not representative of likely sources. We will begin by just looking at data from Ocean Station Papa (OSP). The organic matter sources we will be differentiating are:
+The goal of this document is to assess the separation of different possible sources of organic matter in isotope space, as well as to filter out the samples that are not representative of likely sources. We will begin by just looking at particle data from Station ALOHA. The organic matter sources we will be considering are:
 
   1. Surface particles
   2. Large particles (>51 μm)
   3. Small particles (1-51 μm)
   4. Submicron particles (0.3-1.0 μm)
-  
-And we will visualize each amino acid $\dN$ value does as well as a few essential amino acid $\dC$ values.
 
 ```{r identifying_tracers}
 
@@ -374,7 +372,7 @@ ggplot()+
 
 ```
 
-This suggests that submicron particles are not relevant to organic matter supply and can thus be excluded from our analysis. Small particles are also not likely to be very important in most samples, but because they are more abundant and strongly implicated in previous works we will retain them.
+This suggests that submicron particles are probably not relevant to organic matter supply and can thus be excluded from our analysis. Small particles are also not likely to be very important in most samples, but because they are more abundant and strongly implicated in previous works we will retain them.
 
 Now let's have a look at surface particles and zooplankton and see if there is some subset of surface particles that are more relevant to our study.
 
@@ -444,7 +442,7 @@ ggplot()+
 
 ```
 
-Given the small amount of trophic discrimination we expect to see in Lys this data makes sense, with the majority of zooplankton falling within the particle phenylalanine $\dN$ domain.
+Given the small amount of trophic discrimination we expect to see in Lys these data makes sense, with the majority of zooplankton falling within the particle phenylalanine $\dN$ domain.
 
 Next we need to deal with any gaps that exist in our data. Here will will just omit any samples for which all tracer data is not available.
   

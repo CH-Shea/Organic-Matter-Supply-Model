@@ -148,7 +148,7 @@ source("Functions/OMSM_Zoop_Extract.R")   # Zooplankton parameter extraction
 \newcommand{\dTP}{\mathrm{\Delta TP_{ala-glx}}}
 
 # Summary {-}  
-The purpose of this notebook is to assess isotopic separation of organic matter sources in a particular setting, and then test the ability of an AA-CSIA-based food web model to diagnose the relative importance of those sources to a food web or higher order consumer. The results here are diagnostic of the model's efficacy in a specific setting, and should be used to inform the interpretation of the food web model's output when applied to natural samples of consumers from that same environment.
+The purpose of this notebook is to visualize isotopic separation of organic matter sources in a particular setting, and then test the ability of an AA-CSIA-based food web model to diagnose the relative importance of those sources to a food web or higher order consumer using simulate data. The results here are diagnostic of the model's efficacy in a specific setting, and should be used to inform the interpretation of the food web model's output when applied to natural samples of consumers from that same environment.
 
 This notebook is composed of the following sections:
 
@@ -159,7 +159,7 @@ This notebook is composed of the following sections:
 4. **Model Execution**: Fit the Bayesian model and run diagnostics.
 5. **Model Assessment**: Compare outputs to simulation parameters.
 
-# Setup {-}
+# Setup
 
 In the first few chunks, the user should enter all of the basic information that the model code will need to proceed with analysis.
 
@@ -174,7 +174,7 @@ The first chunk identifies tracers to be included in the model and how to treat 
 Source.Variable <- "Group"
 # Indicate the names representing each possible source of organic matter to the food web/consumer.
 # The order of this vector will describe the order these groups are referenced in figures.
-# The model can accomodate 2-6 organic matter sources, but will need to be modified to accomodate more.
+# The model can accomodate 2-6 organic matter sources, but will need to be modified to accommodate more.
 Sources <- c("Surface","Large","Small")
 # Indicate the names of all the consumer types also present in this column.
 # This could be a generic identifier like "consumer" but should not be left empty here or in the spreadsheet
@@ -189,8 +189,8 @@ Descriptive.Variables <- c("Location","Epoch","Event","Size","Sizecat","Depth","
 ## SPECIFYING TRACERS TO BE USED IN MODEL ##
 # Tracer names should match column names in the data spreadsheet
 # We'll store them in two lists
-Tracers <- list()
-SDTracers <- list()
+Tracers <- list()   ## LEAVE THESE LISTS EMPTY ##
+SDTracers <- list() ## LEAVE THESE LISTS EMPTY ##
 
 # TRACERS FOR TROPHIC EQUATIONS
 # These tracers will not be used to solve mixing equations
@@ -208,7 +208,7 @@ SDTracers$MTS <-
 # TRACERS FOR MIXING EQUATIONS
 # Tracers for trophic equations must not be included in this list
 Tracers$mix <-
-  c(
+  C(
     # "d15NAla",
     # "d15NAsx",
     # "d13CLeu",
@@ -434,7 +434,7 @@ Data.all$Group <- factor(Data.all$Group, levels = c(Sources,Consumers))
 # ))
 ```
 
-Next we will mean normalize the data for a subset of tracers, based on the information given above. This is particularly useful if essential amino acid $\d13C$ values are to be included in the model. Note that the mean value of mean normalized tracers can be added as an additional tracer if that argument is made "TRUE" below.
+Next we will mean normalize the data for a subset of tracers, based on the information given above. This is particularly useful if essential amino acid $\dC$ values are to be included in the model. Note that the mean value of mean normalized tracers can be added as an additional tracer if that argument is made "TRUE" below.
 
 ```{r mean_normalization}
 Data.all.orig <- Data.all
@@ -498,7 +498,7 @@ Data.sources <- na.omit(Data.sources)
 
 ```
 
-# Assessing source separation {-}
+# Source Separation
 
 First lets visualize the value of each tracer in each organic matter source.
 
@@ -585,7 +585,7 @@ if(length(Sources) > 3){
 }
 ```
 
-# Simulating zooplankton data {-}
+# Data Simulation
 
 Next we will simulate some zooplankton data as a way to test the efficacy of the model under different ecological scenarios. We will simulate it using known ecological parameters and the same TDFs that will be supplied to the food web model as a prior. If the organic matter source data provides adequate separation of mixing end member and TDF are well enough constrained relative to the length of the food web expect in wild samples, then the model should return parameters wimilar to those defined in the following chunk.
 
@@ -689,7 +689,7 @@ if (runMV) {
 }
 ```
 
-# Solving food web model using MCMC {-}
+# Model Execution
 Next, we will use Markov Chain Monte Carlo to find PDFs describing the most likely solutions to our mixing problem. First we will write a BUGS model, then use JAGS to do the MCMC.
 
 ## Setting up for MCMC {-}
@@ -860,7 +860,7 @@ diagMCMC(rjo_1$mcmc, parName="mean_z[1,9]")
 
 ```  
 
-# Visualizing Results {-}
+# Model Assessment
 Now let's generate some data structures to store the MCMC output and other relevant data from generating plots and figures. There are a few different data types we need to get out of the MCMC output
 
   1. Global model parameter posteriors (TDFs, d15N(sources))

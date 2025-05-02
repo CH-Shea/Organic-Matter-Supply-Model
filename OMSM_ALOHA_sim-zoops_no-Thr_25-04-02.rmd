@@ -159,7 +159,7 @@ This notebook is composed of the following sections:
 4. **Model Execution**: Fit the Bayesian model and run diagnostics.
 5. **Model Assessment**: Compare outputs to simulation parameters.
 
-# Setup {-}
+# Setup
 
 In the first few chunks, the user should enter all of the basic information that the model code will need to proceed with analysis.
 
@@ -500,7 +500,7 @@ Data.sources <- na.omit(Data.sources)
 
 ```
 
-# Assessing source separation {-}
+# Source Separation
 
 First lets visualize the value of each tracer in each organic matter source.
 
@@ -587,7 +587,7 @@ if(length(Sources) > 3){
 }
 ```
 
-# Simulating zooplankton data {-}
+# Data Simulation
 
 Next we will simulate some zooplankton data as a way to test the efficacy of the model under different ecological scenarios. We will simulate it using known ecological parameters and the same TDFs that will be supplied to the food web model as a prior. If the organic matter source data provides adequate separation of mixing end member and TDF are well enough constrained relative to the length of the food web expect in wild samples, then the model should return parameters wimilar to those defined in the following chunk.
 
@@ -693,7 +693,7 @@ if (runMV) {
 }
 ```
 
-# Solving food web model using MCMC {-}
+# Model Execution
 Next, we will use Markov Chain Monte Carlo to find PDFs describing the most likely solutions to our mixing problem. First we will write a BUGS model, then use JAGS to do the MCMC.
 
 ## Setting up for MCMC {-}
@@ -864,7 +864,7 @@ diagMCMC(rjo_1$mcmc, parName="mean_z[1,9]")
 
 ```  
 
-# Visualizing Results {-}
+# Model Assessment
 Now let's generate some data structures to store the MCMC output and other relevant data from generating plots and figures. There are a few different data types we need to get out of the MCMC output
 
   1. Global model parameter posteriors (TDFs, d15N(sources))

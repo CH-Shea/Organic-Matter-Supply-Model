@@ -25,7 +25,7 @@ rm(list=ls())
 
 # fresh start? If FALSE (select 2 in hard bracket), will only rerun a chunk if 
 # changes are detected within the text of that chunk.
-rmCache <- c(TRUE, FALSE)[1]
+rmCache <- c(TRUE, FALSE)[2]
 tfn <- knitr::current_input()              # name of this file
 tfn <- substr(tfn, 1, nchar(tfn)-4)        # Remove the ".Rmd"
 tfn_cache <- paste0("Caches/", tfn, "_cache")         # Append "_cache" to it
@@ -154,8 +154,8 @@ The following notebook describes linear regression analysis of wild zooplankton 
   1. Zooplankton (0-200 m) and particle (0-100 m) data are aggregated from Station Papa, Station ALOHA, and equatorial sites at 5 N and 8 N.
   2. Phe-normalized $\dNAA$ values are calculated by subtracting $\dNPhe$ from each $\dNAA$ value.
   3. Trophic positions are calculated by assuming TDFs and beta values for Phe, Glx, and Phe.
-  4. Phe-normalized $\dNAA$ values are regressed against TP-1.
-  5. The slope of the regression yields the TDF. The slope + TDF(Phe) yields the $\dN$ value.
+  4. To visualize trophic discrimination, Phe-normalized $\dNAA$ values are regressed against TP-1.
+  5. The slope of the regression is equivalent to the TDF. The slope + TDF(Phe) yields the $\Delta^{15}N$ value.
   6. Analytical uncertainty is propagated through all equations.
   
 # Findings {-}
@@ -232,67 +232,6 @@ TDF.comp[allAA.names] <- TDF.comp[allAA.names] - DN.comp$Phe
 Locs <- c("5N","8N","ALOHA-S","ALOHA-W","OSP")
 ```
 
-Next let's define the functions we will need to analyze this data. The most significant of these will definitely be the two-end member mixing model code.
-
-```{r def-funcs}
-
-# defining function to propagate uncertainty for mean calculations
-# defining function to propagate uncertainty for mean calculations
-SDmean <- function(data, na.rm = FALSE)
-{
-  if (prod(!is.na(data)) == 1) {
-    squareds = data^2
-    sumofsquareds = sum(squareds)
-    root = sqrt(sumofsquareds)
-    SD = root/length(as.double(data))
-    return(SD)
-  } else { if (na.rm == TRUE) {
-    data = na.omit(data)
-    squareds = data^2
-    sumofsquareds = sum(squareds)
-    root = sqrt(sumofsquareds)
-    SD = root/length(data)
-    return(SD)
-  } else {
-    return(NA)
-  }
-  }
-}
-
-## defining a function to propagate error through summing calculations
-SDsum <- function(data)
-{
-   if (is.numeric(data) == TRUE) {
-        squareds = data^2
-        sumofsquareds = sum(squareds)
-        root = sqrt(sumofsquareds)
-        SD = root
-        return(SD)
-    } else {
-        return(NA)
-    }
-}
-
-# defining a function to solve a single-tracer, two-source mixing model
-TwoSrcMM <- function(Mix, SDMix, nMix, SrcA, SDSrcA, nSrcA, SrcB, SDSrcB, nSrcB){
-  # Calculating standard errors
-  seMix <- SDMix/sqrt(nMix)
-  seSrcA <- SDSrcA/sqrt(nSrcA)
-  seSrcB <- SDSrcB/sqrt(nSrcB)
-  # Calculating fA and fB
-  fA <- (Mix-SrcB)/(SrcA-SrcB)
-  fB <- (Mix-SrcA)/(SrcB-SrcA)
-  # Calculating vafA and vafB
-  vafA <- (1/(SrcA-SrcB)^2) * (seMix^2 + fA^2*seSrcA^2 + (1-fA)^2*seSrcB^2)
-  vafB <- (1/(SrcB-SrcA)^2) * (seMix^2 + fB^2*seSrcB^2 + (1-fB)^2*seSrcA^2)
-  # Calculating SDfA and SDfB
-  SDfA <- sqrt(vafA)
-  SDfB <- sqrt(vafB)
-  return(data.frame(fA=fA,SDfA=SDfA,fB=fB,SDfB=SDfB))
-}
-
-```
-
 
 ## Data Handling {-}
 
@@ -330,8 +269,6 @@ dN.all <-
     dN.all[,
            c("Group","Type","Sizecat","Size","Depth","Event","Tow","Epoch","Location")],
     dN.all[allAA.ord])
-
-data.romero <- as.data.frame(read_excel("~/University_of_Hawaii/SIA_work/EXPORTS/Data/Literature/Romero-Romero2020.xlsx"))
 ```
 
 ### Calculating TP {-}
