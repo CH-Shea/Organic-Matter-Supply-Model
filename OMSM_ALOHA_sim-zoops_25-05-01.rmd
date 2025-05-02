@@ -152,7 +152,7 @@ The purpose of this notebook is to visualize isotopic separation of organic matt
 
 This notebook is composed of the following sections:
 
-### Sections:
+### Sections: {-}
 1. **Setup**: Input data and parameters.
 2. **Source Separation**: Multivariate analysis of source distinction.
 3. **Data Simulation**: Generate synthetic zooplankton data.
@@ -208,7 +208,7 @@ SDTracers$MTS <-
 # TRACERS FOR MIXING EQUATIONS
 # Tracers for trophic equations must not be included in this list
 Tracers$mix <-
-  C(
+  c(
     # "d15NAla",
     # "d15NAsx",
     # "d13CLeu",
@@ -432,45 +432,6 @@ Data.all$Group <- factor(Data.all$Group, levels = c(Sources,Consumers))
 #   c("0.3-1 μm", "1-5 μm", "1-6 μm", "6-51 μm", ">51 μm", "Sediment Trap",
 #   "0.2-0.5 mm", "0.5-1.0 mm", "1-2 mm", "2-5 mm", ">5 mm")
 # ))
-```
-
-Next we will mean normalize the data for a subset of tracers, based on the information given above. This is particularly useful if essential amino acid $\dC$ values are to be included in the model. Note that the mean value of mean normalized tracers can be added as an additional tracer if that argument is made "TRUE" below.
-
-```{r mean_normalization}
-Data.all.orig <- Data.all
-# If mean normalizing some of the data
-if(meannorm == TRUE) {
-  # Calculating the mean value of those AAs in each sample
-  MN <- rowMeans(Data.all[meannorm.which])
-  SD <- c()
-  for (i in 1:nrow(Data.all)) {
-    SD <- append(SD, SDmean(Data.all.orig[i,SDmeannorm.which]))
-  }
-  # Subtracting that from the EAA δ13C values for each sample
-  # and replacing raw δ13C values in main data frame with mean normalized ones
-  Data.all[meannorm.which] <- sweep(Data.all[meannorm.which], 1, MN, "-")
-  # Can include the mean values as an additional tracer
-  include_meannorm_mean <- FALSE # make true to include mean values as separate tracer
-  if(include_meannorm_mean == TRUE){
-    Data.all$meannorm_mean <- MN
-    Data.all$SDmeannorm_mean <- SD
-    Tracers$all <- append(Tracers$all, "EAA")
-    SDTracers$all <- append(SDTracers$all, "SDEAA")
-  }
-}
-
-# we'll also need the mean values of tracers in organic matter sources later...
-# first calculating the mean tracer value for each organic matter source group
-src.mn <- 
-  aggregate(Data.all[Tracers$all], # aggregate source data
-            by=list(Group = Data.all[["Group"]]), # by organic matter source group
-            FUN = mean, na.rm=TRUE)[-1] # taking a mean
-# and the SD
-# we will calculate the standard deviation within each population
-src.SD <- 
-  aggregate(Data.all[Tracers$all], # aggregate source data
-            by=list(Group = Data.all[["Group"]]), # by organic matter source group
-            FUN = sd, na.rm=TRUE)[-1] # calculating SD within the population
 ```
 
 Now we'll pull out the organic matter source data data as a separate data frame.
