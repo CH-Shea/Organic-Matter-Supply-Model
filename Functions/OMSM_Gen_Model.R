@@ -3,10 +3,11 @@
 # We have multiple string options up through the mixing model portion of the code to accommodate different number of organic matter sources.
 OMSM_Gen_Model <- function(
     N_S,
-    Tracers_NoFrac = FALSE,
-    Tracers_ConstFrac = FALSE,
-    Tracers_VarFrac = FALSE
+    Data.OMSM
 ){
+  if(Data.OMSM$i_T_non[1]==0){Tracers_NoFrac <- FALSE}else{Tracers_NoFrac <- TRUE}
+  if(Data.OMSM$i_T_const[1]==0){Tracers_ConstFrac <- FALSE}else{Tracers_ConstFrac <- TRUE}
+  if(Data.OMSM$i_T_var[1]==0){Tracers_VarFrac <- FALSE}else{Tracers_VarFrac <- TRUE}
   
 OMSM_Source_Data_and_Priors_2 <-
   "/* observe tracers in sources */
@@ -429,11 +430,11 @@ OMSM_Full <-
       "OMSM_Mixing",
       N_S,sep="_"))),
     OMSM_Trophic_Parameters,
-    if(Data.1$i_T_non[1]==0){"  "}
+    if(Data.OMSM$i_T_non[1]==0){"  "}
     else{OMSM_Discrimination_Conservative},
-    if(Data.1$i_T_const[1]==0){"  "}
+    if(Data.OMSM$i_T_const[1]==0){"  "}
     else{OMSM_Discrimination_Constant},
-    if(Data.1$i_T_var[1]==0){"  "}
+    if(Data.OMSM$i_T_var[1]==0){"  "}
     else{OMSM_Discrimination_Variable},
     OMSM_Observing_Consumers,
     sep = " \n "
