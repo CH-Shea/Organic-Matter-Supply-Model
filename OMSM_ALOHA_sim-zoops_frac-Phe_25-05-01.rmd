@@ -184,7 +184,7 @@ Data.all <-
 ```
 
 ## Identifying Tracers {-}
-Next we'll identify tracers to be included in the model and some key parameters on how to treat them. Here we'll be using $\dN$ values of Phe, Lys, and Thr. We'll be treating Phe as a conservative tracer.
+Next we'll identify tracers to be included in the model and some key parameters on how to treat them. Here we'll be using $\dN$ values of Phe, Lys, and Thr. All tracers are assumed to fractionate during trophic transfer.
 
 ```{r identifying_tracers}
 #### IDENTIFYING SOURCE AND DESCRIPTIVE VARIABLES ####
@@ -265,7 +265,7 @@ SDTracers$mix <-
 # Specify the names for all tracers with constant trophic discrimination  and their uncertainty(i.e., TDF(protozoan) = TDF(metazoan))
 Tracers$constTDF <- 
   c(
-    # "d15NPhe",
+    "d15NPhe",
     "d15NAla", 
     "d15NPro", 
     "d15NSer", 
@@ -274,7 +274,7 @@ Tracers$constTDF <-
   )
 SDTracers$constTDF <- 
   c(
-    # "SDd15NPhe",
+    "SDd15NPhe",
     "SDd15NAla", 
     "SDd15NPro", 
     "SDd15NSer", 
@@ -299,7 +299,7 @@ SDTracers$varTDF <-
 # Specify the names for all conservative tracers and their uncertainty (i.e., no trophic discrimination is expected)
 Tracers$non <- 
   c(
-    "d15NPhe"
+    # "d15NPhe"
     # "d13CThr", 
     # "d13CVal", 
     # "d13CLeu", 
@@ -308,7 +308,7 @@ Tracers$non <-
   )
 SDTracers$non <- 
   c(
-    "SDd15NPhe"
+    # "SDd15NPhe"
     # "SDd13CThr", 
     # "SDd13CVal", 
     # "SDd13CLeu", 
@@ -544,8 +544,8 @@ For Station ALOHA, we will simulate 50 sample with random mixing coefficients. P
 ## Sim_Zoop_RealPhe uses 0.3‰ trophic discrimination in Phe to simulate zooplankton
 ## data even if the model will assume it is conservative.
 
-Sim_Zoop_RealPhe( # use this if treating Phe as a conservative tracer in the model
-  # Sim_Zoop( # use this if treating Phe as a fractionating tracer in the model
+# Sim_Zoop_RealPhe( # use this if treating Phe as a conservative tracer in the model
+Sim_Zoop( # use this if treating Phe as a fractionating tracer in the model
   Random_Samples = TRUE,
   nzoops = 50, # If Random_Samples = TRUE define number of samples
   incr = 0.2, # if Random_Samples = FALSE define spacing of samples in compositional space
@@ -565,8 +565,8 @@ Sim_Zoop_RealPhe( # use this if treating Phe as a conservative tracer in the mod
 ```
 
 ## Plotting Simulated Data {-}
-Let's plot out the tracer values of organic matter sources and zooplankton.
 
+Let's plot out the tracer values of organic matter sources and zooplankton.
 ```{r Tracers_Zoops.plots, dpi=300, fig.asp=0.3, fig.width=8}
 
 plot_Source_Consumer_Sim(
@@ -786,8 +786,289 @@ save(posts,
      posts.long,
      Data.all,
      zoops.sim,
-     file = "Data/ALOHAsim_OMSM_posteriors.RData")
+     file = "Data/ALOHAsim_OMSM_frac-Phe_posteriors.RData")
 ```
+
+
+# Comparing to model results without fractionation in Phe {-}
+
+Now we'd like to build a couple simple plots illustrating how including/excluding fractionation in Phe impacts our ability to accurately solve the mixing problem.
+
+```{r model-comparison, fig.width=4, fig.asp=1.4, dpi = 300}
+
+data.true <- zoops.f[Sources]
+data.model <- posts$f$mode[Sources]
+
+
+mix.disc <- data.model-data.true
+mix.disc$Model <- "OMSM - fractionating Phe"
+mix.disc$Model <- factor(mix.disc$Model, levels = c("OMSM - conservative Phe","OMSM - fractionating Phe"))
+
+data.model.long <- 
+  melt(data.model[Sources], 
+       value.name = "f_model",
+       variable.name = "Source"
+  )
+data.true.long <- 
+  melt(data.true[Sources], 
+       value.name = "f_true",
+       variable.name = "Source"
+  )
+data.truemod.long <-
+  cbind(
+    data.true.long,
+    data.model.long["f_model"]
+  )
+data.truemod.long$f_disc <-
+  data.truemod.long$f_model -
+  data.truemod.long$f_true
+
+
+
+load("Data/ALOHAsim_OMSM_posteriors.RData")
+posts.OMSM2 <- posts
+posts.OMSM2.long <- posts.long
+
+data.true <- zoops.f[c("Surface","Large","Small")]
+data.model.full <- 
+  cbind(
+    posts.OMSM2$f$mode[c("Surface","Large","Small")]
+  )
+
+mix.disc.full <- data.model.full-data.true
+mix.disc.full$Model <- "OMSM - conservative Phe" # posts.mode$Model
+mix.disc.full$Model <- factor(mix.disc.full$Model, levels = c("OMSM - conservative Phe","OMSM - fractionating Phe"))
+
+
+
+data.model.full.long <- 
+  melt(data.model.full[Sources], 
+       value.name = "f_model",
+       variable.name = "Source"
+  )
+data.true.long <- 
+  melt(data.true[Sources], 
+       value.name = "f_true",
+       variable.name = "Source"
+  )
+data.truemod.full.long <-
+  cbind(
+    data.true.long,
+    data.model.full.long["f_model"]
+  )
+data.truemod.full.long$f_disc <-
+  data.truemod.full.long$f_model -
+  data.truemod.long$f_true
+
+
+plot.TM.surf <-
+  ggplot()+
+  geom_smooth(data = subset(data.truemod.long, Source == "Surface"),
+    aes(x = f_true, y = f_model, color = "Fractionating Phe"),
+        fill = "salmon",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_smooth(data = subset(data.truemod.full.long, Source == "Surface"),
+    aes(x = f_true, y = f_model, color = "Conservative Phe"),
+        fill = "skyblue1",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(data = subset(data.truemod.long, Source == "Surface"),
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 1, color = "red4"
+  )+
+  geom_point(data = subset(data.truemod.full.long, Source == "Surface"),
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 1, color = "steelblue4"
+  )+
+  scale_color_manual(values = c("royalblue4","red3"))+
+  labs(color = "")+
+  geom_abline(slope = 1, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(0,1), xlim = c(0,1), expand = FALSE)+
+  scale_x_continuous(breaks = c(0,0.5,1))+
+  scale_y_continuous(breaks = c(0,0.5,1))
+# plot.TM.surf
+
+plot.TM.large <-
+  ggplot()+
+  geom_smooth(data = subset(data.truemod.long, Source == "Large"),
+    aes(x = f_true, y = f_model, color = "Fractionating Phe"),
+        fill = "salmon",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_smooth(data = subset(data.truemod.full.long, Source == "Large"),
+    aes(x = f_true, y = f_model, color = "Conservative Phe"),
+        fill = "skyblue1",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(data = subset(data.truemod.long, Source == "Large"),
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 1, color = "red4"
+  )+
+  geom_point(data = subset(data.truemod.full.long, Source == "Large"),
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 1, color = "steelblue4"
+  )+
+  scale_color_manual(values = c("royalblue4","red3"))+
+  labs(color = "")+
+  geom_abline(slope = 1, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(0,1), xlim = c(0,1), expand = FALSE)+
+  scale_x_continuous(breaks = c(0,0.5,1))+
+  scale_y_continuous(breaks = c(0,0.5,1))
+# plot.TM.large
+
+plot.TM.small <-
+  ggplot()+
+  geom_smooth(data = subset(data.truemod.long, Source == "Small"),
+    aes(x = f_true, y = f_model, color = "Fractionating Phe"),
+        fill = "salmon",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_smooth(data = subset(data.truemod.full.long, Source == "Small"),
+    aes(x = f_true, y = f_model, color = "Conservative Phe"),
+        cfill = "skyblue1",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(data = subset(data.truemod.long, Source == "Small"),
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 1, color = "red4"
+  )+
+  geom_point(data = subset(data.truemod.full.long, Source == "Small"),
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 1, color = "steelblue4"
+  )+
+  scale_color_manual(values = c("royalblue4","red3"))+
+  labs(color = "")+
+  geom_abline(slope = 1, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(0,1), xlim = c(0,1), expand = FALSE)+
+  scale_x_continuous(breaks = c(0,0.5,1))+
+  scale_y_continuous(breaks = c(0,0.5,1))
+# plot.TM.small
+
+plot.disc.surf <-
+  ggplot()+
+  geom_smooth(data = subset(data.truemod.long, Source == "Surface"),
+    aes(x = f_true, y = f_disc, color = "Fractionating Phe"),
+        fill = "salmon",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_smooth(data = subset(data.truemod.full.long, Source == "Surface"),
+    aes(x = f_true, y = f_disc, color = "Conservative Phe"),
+        fill = "skyblue1",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(data = subset(data.truemod.long, Source == "Surface"),
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 1, color = "red4"
+  )+
+  geom_point(data = subset(data.truemod.full.long, Source == "Surface"),
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 1, color = "steelblue4"
+  )+
+  scale_color_manual(values = c("royalblue4","red3"))+
+  labs(color = "")+
+  geom_abline(slope = 0, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(-1,1), xlim = c(0,1), expand = FALSE)+
+  scale_x_continuous(breaks = c(-1,-0.5,0,0.5,1))+
+  scale_y_continuous(breaks = c(-1,-0.5,0,0.5,1))
+# plot.disc.surf
+
+plot.disc.large <-
+  ggplot()+
+  geom_smooth(data = subset(data.truemod.long, Source == "Large"),
+    aes(x = f_true, y = f_disc, color = "Fractionating Phe"),
+        fill = "salmon",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_smooth(data = subset(data.truemod.full.long, Source == "Large"),
+    aes(x = f_true, y = f_disc, color = "Conservative Phe"),
+        fill = "skyblue1",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(data = subset(data.truemod.long, Source == "Large"),
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 1, color = "red4"
+  )+
+  geom_point(data = subset(data.truemod.full.long, Source == "Large"),
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 1, color = "steelblue4"
+  )+
+  scale_color_manual(values = c("royalblue4","red3"))+
+  labs(color = "")+
+  geom_abline(slope = 0, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(-1,1), xlim = c(0,1), expand = FALSE)+
+  scale_x_continuous(breaks = c(-1,-0.5,0,0.5,1))+
+  scale_y_continuous(breaks = c(-1,-0.5,0,0.5,1))
+# plot.disc.large
+
+plot.disc.small <-
+  ggplot()+
+  geom_smooth(data = subset(data.truemod.long, Source == "Small"),
+    aes(x = f_true, y = f_disc, color = "Fractionating Phe"),
+        fill = "salmon",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_smooth(data = subset(data.truemod.full.long, Source == "Small"),
+    aes(x = f_true, y = f_disc, color = "Conservative Phe"),
+        cfill = "skyblue1",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(data = subset(data.truemod.long, Source == "Small"),
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 1, color = "red4"
+  )+
+  geom_point(data = subset(data.truemod.full.long, Source == "Small"),
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 1, color = "steelblue4"
+  )+
+  scale_color_manual(values = c("royalblue4","red3"))+
+  labs(color = "")+
+  geom_abline(slope = 0, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(-1,1), xlim = c(0,1), expand = FALSE)+
+  scale_x_continuous(breaks = c(-1,-0.5,0,0.5,1))+
+  scale_y_continuous(breaks = c(-1,-0.5,0,0.5,1))
+# plot.disc.small
+
+
+ggarrange(
+  ggplot() + geom_blank() + ggtitle("Modeled\nvs True") + 
+    theme(plot.title = element_text(hjust = 0.65)),
+  ggplot() + geom_blank() + ggtitle("Disrepancy") + 
+    theme(plot.title = element_text(hjust = 0.55)),
+  
+  plot.TM.surf + no.x.axis + ylab("f(surface)"), 
+  plot.disc.surf + no.x.axis + 
+    theme(axis.title.y = element_blank()), 
+  
+  plot.TM.large + no.x.axis + ylab("f(large)"), 
+  plot.disc.large + no.x.axis + 
+    theme(axis.title.y = element_blank()),
+  
+  plot.TM.small + ylab("f(small)") + xlab("True Value"),
+  plot.disc.small + xlab("True Value") +
+    theme(axis.title.y = element_blank()),
+  
+  ncol = 2, nrow = 4,
+  heights = c(0.4,1,1,1.2),
+  widths = c(1.1,1),
+  common.legend = TRUE,
+  legend = "bottom"
+)
+```
+
+
 
 
 

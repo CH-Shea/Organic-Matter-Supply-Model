@@ -1,5 +1,5 @@
 ---
-title: "Organic Matter Supply Model: Assessing model performance using simulated data from Station ALOHA"
+title: "Organic Matter Supply Model: Assessing model performance using simulated data from Station ALOHA - excluding threonine"
 author: "Connor Shea"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output: 
@@ -155,11 +155,11 @@ The purpose of this notebook is to visualize isotopic separation of organic matt
 This notebook is composed of the following sections:
 
 ### Sections: {-}
-1. **Setup**: Input data and parameters.
-2. **Source Separation**: Visualization of source distinction.
+1. **Setup**: Input data and parameters. ** User input required **
+2. **Source Separation**: Multivariate analysis of source distinction.
 3. **Data Simulation**: Generate synthetic zooplankton data.
 4. **Model Execution**: Fit the Bayesian model and run diagnostics.
-5. **Model Assessment**: Compare model outputs to simulation parameters.
+5. **Model Assessment**: Compare outputs to simulation parameters.
 
 # Setup
 
@@ -184,7 +184,7 @@ Data.all <-
 ```
 
 ## Identifying Tracers {-}
-Next we'll identify tracers to be included in the model and some key parameters on how to treat them. Here we'll be using $\dN$ values of Phe, Lys, and Thr. We'll be treating Phe as a conservative tracer.
+Next we'll identify tracers to be included in the model and some key parameters on how to treat them. Here we'll be using $\dN$ values of Phe and Lys. We'll be treating Phe as a conservative tracer.
 
 ```{r identifying_tracers}
 #### IDENTIFYING SOURCE AND DESCRIPTIVE VARIABLES ####
@@ -242,7 +242,7 @@ Tracers$mix <-
     # "d13CLeu",
     # "d13CIle",
     # "d15NPro",
-    "d15NThr",
+    # "d15NThr",
     # "d15NSer",
     # "d15NGly",
     "d15NLys",
@@ -255,7 +255,7 @@ SDTracers$mix <-
     # "SDd13CLeu",
     # "SDd13CIle",
     # "SDd15NPro",
-    "SDd15NThr",
+    # "SDd15NThr",
     # "SDd15NSer",
     # "SDd15NGly",
     "SDd15NLys",
@@ -565,8 +565,8 @@ Sim_Zoop_RealPhe( # use this if treating Phe as a conservative tracer in the mod
 ```
 
 ## Plotting Simulated Data {-}
-Let's plot out the tracer values of organic matter sources and zooplankton.
 
+Let's plot out the tracer values of organic matter sources and zooplankton.
 ```{r Tracers_Zoops.plots, dpi=300, fig.asp=0.3, fig.width=8}
 
 plot_Source_Consumer_Sim(
@@ -786,8 +786,289 @@ save(posts,
      posts.long,
      Data.all,
      zoops.sim,
-     file = "Data/ALOHAsim_OMSM_posteriors.RData")
+     file = "Data/ALOHAsim_OMSM_no-Thr_posteriors.RData")
 ```
+
+# Comparing to model results including Thr {-}
+
+Now we'd like to build a couple simple plots illustrating how including/excluding a trophic AA like Thr impact our ability to accurately solve the mixing problem.
+
+```{r model-comparison, fig.width=4, fig.asp=1.4, dpi = 300}
+
+data.true <- zoops.f[Sources]
+data.model <- posts$f$mode[Sources]
+# data.model$Model <- "OMSM - no Thr"
+# data.model$Model <- factor(data.model$Model, levels = c("OMSM - full","OMSM - no Thr"))
+
+
+mix.disc <- data.model-data.true
+mix.disc$Model <- "OMSM - no Thr"
+mix.disc$Model <- factor(mix.disc$Model, levels = c("OMSM - full","OMSM - no Thr"))
+
+data.model.long <- 
+  melt(data.model[Sources], 
+       value.name = "f_model",
+       variable.name = "Source"
+  )
+data.true.long <- 
+  melt(data.true[Sources], 
+       value.name = "f_true",
+       variable.name = "Source"
+  )
+data.truemod.long <-
+  cbind(
+    data.true.long,
+    data.model.long["f_model"]
+  )
+data.truemod.long$f_disc <-
+  data.truemod.long$f_model -
+  data.truemod.long$f_true
+
+
+
+load("Data/ALOHAsim_OMSM_posteriors.RData")
+posts.OMSM2 <- posts
+posts.OMSM2.long <- posts.long
+
+data.true <- zoops.f[c("Surface","Large","Small")]
+data.model.full <- 
+  cbind(
+    posts.OMSM2$f$mode[c("Surface","Large","Small")]
+  )
+
+mix.disc.full <- data.model.full-data.true
+mix.disc.full$Model <- "OMSM - no Thr" # posts.mode$Model
+mix.disc.full$Model <- factor(mix.disc.full$Model, levels = c("OMSM - full","OMSM - no Thr"))
+
+
+
+data.model.full.long <- 
+  melt(data.model.full[Sources], 
+       value.name = "f_model",
+       variable.name = "Source"
+  )
+data.true.long <- 
+  melt(data.true[Sources], 
+       value.name = "f_true",
+       variable.name = "Source"
+  )
+data.truemod.full.long <-
+  cbind(
+    data.true.long,
+    data.model.full.long["f_model"]
+  )
+data.truemod.full.long$f_disc <-
+  data.truemod.full.long$f_model -
+  data.truemod.long$f_true
+
+
+plot.TM.surf <-
+  ggplot()+
+  geom_smooth(data = subset(data.truemod.long, Source == "Surface"),
+    aes(x = f_true, y = f_model, color = "Without Threonine"),
+        fill = "salmon",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_smooth(data = subset(data.truemod.full.long, Source == "Surface"),
+    aes(x = f_true, y = f_model, color = "Full Model"),
+        fill = "skyblue1",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(data = subset(data.truemod.long, Source == "Surface"),
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 1, color = "red4"
+  )+
+  geom_point(data = subset(data.truemod.full.long, Source == "Surface"),
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 1, color = "steelblue4"
+  )+
+  scale_color_manual(values = c("royalblue4","red3"))+
+  labs(color = "")+
+  geom_abline(slope = 1, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(0,1), xlim = c(0,1), expand = FALSE)+
+  scale_x_continuous(breaks = c(0,0.5,1))+
+  scale_y_continuous(breaks = c(0,0.5,1))
+# plot.TM.surf
+
+plot.TM.large <-
+  ggplot()+
+  geom_smooth(data = subset(data.truemod.long, Source == "Large"),
+    aes(x = f_true, y = f_model, color = "Without Threonine"),
+        fill = "salmon",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_smooth(data = subset(data.truemod.full.long, Source == "Large"),
+    aes(x = f_true, y = f_model, color = "Full Model"),
+        fill = "skyblue1",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(data = subset(data.truemod.long, Source == "Large"),
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 1, color = "red4"
+  )+
+  geom_point(data = subset(data.truemod.full.long, Source == "Large"),
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 1, color = "steelblue4"
+  )+
+  scale_color_manual(values = c("royalblue4","red3"))+
+  labs(color = "")+
+  geom_abline(slope = 1, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(0,1), xlim = c(0,1), expand = FALSE)+
+  scale_x_continuous(breaks = c(0,0.5,1))+
+  scale_y_continuous(breaks = c(0,0.5,1))
+# plot.TM.large
+
+plot.TM.small <-
+  ggplot()+
+  geom_smooth(data = subset(data.truemod.long, Source == "Small"),
+    aes(x = f_true, y = f_model, color = "Without Threonine"),
+        fill = "salmon",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_smooth(data = subset(data.truemod.full.long, Source == "Small"),
+    aes(x = f_true, y = f_model, color = "Full Model"),
+        fill = "skyblue1",
+    # method = "lm"
+    method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(data = subset(data.truemod.long, Source == "Small"),
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 1, color = "red4"
+  )+
+  geom_point(data = subset(data.truemod.full.long, Source == "Small"),
+    aes(x = f_true, y = f_model),
+    size = 1, stroke=1, shape = 1, color = "steelblue4"
+  )+
+  scale_color_manual(values = c("royalblue4","red3"))+
+  labs(color = "")+
+  geom_abline(slope = 1, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(0,1), xlim = c(0,1), expand = FALSE)+
+  scale_x_continuous(breaks = c(0,0.5,1))+
+  scale_y_continuous(breaks = c(0,0.5,1))
+# plot.TM.small
+
+plot.disc.surf <-
+  ggplot()+
+  geom_smooth(data = subset(data.truemod.long, Source == "Surface"),
+    aes(x = f_true, y = f_disc, color = "Without Threonine"),
+        fill = "salmon",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_smooth(data = subset(data.truemod.full.long, Source == "Surface"),
+    aes(x = f_true, y = f_disc, color = "Full Model"),
+        fill = "skyblue1",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(data = subset(data.truemod.long, Source == "Surface"),
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 1, color = "red4"
+  )+
+  geom_point(data = subset(data.truemod.full.long, Source == "Surface"),
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 1, color = "steelblue4"
+  )+
+  scale_color_manual(values = c("royalblue4","red3"))+
+  labs(color = "")+
+  geom_abline(slope = 0, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(-1,1), xlim = c(0,1), expand = FALSE)+
+  scale_x_continuous(breaks = c(-1,-0.5,0,0.5,1))+
+  scale_y_continuous(breaks = c(-1,-0.5,0,0.5,1))
+# plot.disc.surf
+
+plot.disc.large <-
+  ggplot()+
+  geom_smooth(data = subset(data.truemod.long, Source == "Large"),
+    aes(x = f_true, y = f_disc, color = "Without Threonine"),
+        fill = "salmon",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_smooth(data = subset(data.truemod.full.long, Source == "Large"),
+    aes(x = f_true, y = f_disc, color = "Full Model"),
+        fill = "skyblue1",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(data = subset(data.truemod.long, Source == "Large"),
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 1, color = "red4"
+  )+
+  geom_point(data = subset(data.truemod.full.long, Source == "Large"),
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 1, color = "steelblue4"
+  )+
+  scale_color_manual(values = c("royalblue4","red3"))+
+  labs(color = "")+
+  geom_abline(slope = 0, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(-1,1), xlim = c(0,1), expand = FALSE)+
+  scale_x_continuous(breaks = c(-1,-0.5,0,0.5,1))+
+  scale_y_continuous(breaks = c(-1,-0.5,0,0.5,1))
+# plot.disc.large
+
+plot.disc.small <-
+  ggplot()+
+  geom_smooth(data = subset(data.truemod.long, Source == "Small"),
+    aes(x = f_true, y = f_disc, color = "Without Threonine"),
+        fill = "salmon",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_smooth(data = subset(data.truemod.full.long, Source == "Small"),
+    aes(x = f_true, y = f_disc, color = "Full Model"),
+        cfill = "skyblue1",
+    method = "lm"
+    # method = "glm", method.args = list(family = binomial())
+  )+
+  geom_point(data = subset(data.truemod.long, Source == "Small"),
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 1, color = "red4"
+  )+
+  geom_point(data = subset(data.truemod.full.long, Source == "Small"),
+    aes(x = f_true, y = f_disc),
+    size = 1, stroke=1, shape = 1, color = "steelblue4"
+  )+
+  scale_color_manual(values = c("royalblue4","red3"))+
+  labs(color = "")+
+  geom_abline(slope = 0, intercept = 0, size = 1, color = "goldenrod")+
+  coord_cartesian(ylim = c(-1,1), xlim = c(0,1), expand = FALSE)+
+  scale_x_continuous(breaks = c(-1,-0.5,0,0.5,1))+
+  scale_y_continuous(breaks = c(-1,-0.5,0,0.5,1))
+# plot.disc.small
+
+
+ggarrange(
+  ggplot() + geom_blank() + ggtitle("Modeled\nvs True") + 
+    theme(plot.title = element_text(hjust = 0.65)),
+  ggplot() + geom_blank() + ggtitle("Disrepancy") + 
+    theme(plot.title = element_text(hjust = 0.55)),
+  
+  plot.TM.surf + no.x.axis + ylab("f(surface)"), 
+  plot.disc.surf + no.x.axis + 
+    theme(axis.title.y = element_blank()), 
+  
+  plot.TM.large + no.x.axis + ylab("f(large)"), 
+  plot.disc.large + no.x.axis + 
+    theme(axis.title.y = element_blank()),
+  
+  plot.TM.small + ylab("f(small)") + xlab("True Value"),
+  plot.disc.small + xlab("True Value") +
+    theme(axis.title.y = element_blank()),
+  
+  ncol = 2, nrow = 4,
+  heights = c(0.4,1,1,1.2),
+  widths = c(1.1,1),
+  common.legend = TRUE,
+  legend = "bottom"
+)
+```
+
 
 
 
