@@ -1,5 +1,5 @@
 ---
-title: "Determination of D15N values in wild zooplaknton by regression analysis"
+title: "Determination of D15N values in wild zooplankton by regression analysis"
 author: "Connor Shea"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output: 
@@ -102,8 +102,7 @@ no.y.axis <- theme(axis.title.y=element_blank(),
 
 # Loading up some functions we might need
 source("Functions/calcSDs.R") # contains functions SDmean() and SDsum()
-source("Functions/Post-Mode.R") # contains function post.mode()
-source("Functions/SplitViolin.R") # contains function geom_split_violin()
+source("Functions/Post_Mode.R") # contains function post.mode()
 ``` 
 
 \newcommand{\um}{\ \mu \mathrm{ m}}
@@ -153,9 +152,10 @@ The following notebook describes linear regression analysis of wild zooplankton 
 
   1. Zooplankton (0-200 m) and particle (0-100 m) data are aggregated from Station Papa, Station ALOHA, and equatorial sites at 5 N and 8 N.
   2. Phe-normalized $\dNAA$ values are calculated by subtracting $\dNPhe$ from each $\dNAA$ value.
-  3. Trophic positions are calculated by assuming TDFs and beta values for Phe, Glx, and Phe.
+  3. Trophic positions are calculated by assuming TDFs and beta values for Phe, Glx, and Phe. TDFs are derived from those presented in Table 2, while $\beta$-values are from Chikaraishi et al. 2009.
   4. To visualize trophic discrimination, Phe-normalized $\dNAA$ values are regressed against TP-1.
   5. The slope of the regression is equivalent to the TDF. The slope + TDF(Phe) yields the $\Delta^{15}N$ value.
+  6. $\Delta^{15}N_{AA}$ values are calculated 
   6. Analytical uncertainty is propagated through all equations.
   
 # Findings {-}
@@ -205,8 +205,8 @@ allAA.ord.names <- c("Glx", "SDGlx",	"Ala", "SDAla",	"Asx", "SDAsx",	"Ile", "SDI
 ## defining the TDF data from McMahon et al. 2016.
 
 TP.parms = data.frame("AAs"   = c("glx-Phe", "ala-Phe", "thr-Phe", "trp-src"),
-                      "TDF"   = c(7.6      , 5.1      ,-5.8      , 6.3),
-                      "SDTDF" = c(1.2      , 2.1      , 3.2      , 0.9),
+                      "TDF"   = c(7.7      , 6.1      ,-6.2      , 6.3),
+                      "SDTDF" = c(1.8      , 2.8      , 3.6      , 0.9),
                       "beta"  = c(3.4      , 3.2      ,-2.4      , 2.2),
                       "SDbeta"= c(0.9      , 1.2      , 0.4      , 0.7)
                       )
@@ -237,7 +237,7 @@ Locs <- c("5N","8N","ALOHA-S","ALOHA-W","OSP")
 
 ### Importing Data {-}
 
-First we will import all data from 5 N, 8 N, ALOHA-S, ALOHA-W, and OSP. We want this all in one big data frame with columns for descriptive variables, AA $\dN$ values, and the standard deviations for each AA $\dN$ value.
+We will import all data from 5 N, 8 N, ALOHA-S, ALOHA-W, and OSP. We want this all in one big data frame with columns for descriptive variables, AA $\dN$ values, and the standard deviations for each AA $\dN$ value.
 
 ```{r import-data}
 # Importing data from each location
@@ -293,7 +293,7 @@ To assess error in TP we will use the equation from Bradley et al. 2015:
                  \left( \frac{\delta^{15}N_{src} + \beta_{trp-src} - \delta^{15}N_{trp}}{TDF_{trp-src}^2} \right)^2\sigma^2_{TDF_{trp-src}}
 \end{align}
 
-```{r Derive-Params}
+```{r Calc-TP}
 data.all <- dN.all
 # Calculating TP_Glx-Phe with SD
 data.all$TPGlx <- (data.all$d15NGlx - data.all$d15NPhe - TP.parms$beta[1])/TP.parms$TDF[1]+1
