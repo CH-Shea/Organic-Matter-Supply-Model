@@ -107,9 +107,8 @@ no.y.axis <- theme(axis.title.y=element_blank(),
 
 # Loading up some functions we might need
 source("Functions/calcSDs.R") # contains functions SDmean() and SDsum()
-source("Functions/Post-Mode.R") # contains function post.mode()
-source("Functions/SplitViolin.R") # contains function geom_split_violin()
-source("Functions/estimate.ED.R") # contains funcion estimate.ED()
+source("Functions/Post_Mode.R") # contains function post.mode()
+source("Utilities/estimate.ED.R") # contains funcion estimate.ED()
 ```  
 
 <!-- The following commands provide a shorthand for common symbols when used in math mode. -->
@@ -501,7 +500,17 @@ if (simulate_rep == FALSE) {
 
 ```
 
-# All Tracers {-}
+# Statistical comparison tests {-}
+
+Now we will do a series of statistical tests on our data. We will look at three specific tracer sets:
+
+  1. All tracer $dNAA$ values
+  2. Just SAA $\dNAA$ values (Phe, Lys, Ser, Gly)
+  3. A select group of $\dNAA$ values (Phe, Lys, Thr)
+  
+We'll wan to calculate Person's correlation coefficients for all tracer pairs, and then for each set of tracers we'll calculate the effective dimensionality, and fit PCAs and LDAs.
+
+## 1. All Tracers {-}
 
 Here's the data we are able to work with for these sources of organic matter at Station Papa.
 
@@ -557,7 +566,7 @@ AA_plots <-
 AA_plots
 ```
 
-## PERMANOVA and Tukey's pairwise comparison test {-}
+### PERMANOVA and Tukey's pairwise comparison test {-}
 
 Our first task is to conduct a pairwise comparison tests to see which tracers can differentiate which sources. We'll use PERMANOVA as a multivariate of weather or not different sources have significantly different $\dN$ values. We will use Tukey as a pairwise assessment to see which amino acids alone have different $\dN$ values between groups. We'll run these tests first with source group and season as predictors to see if summer vs winter differences are impacting the data. Expand the code chunk to see permanova results.
 
@@ -597,7 +606,7 @@ for (i in tracers) {
 }
 ```
 
-## Correlation analysis {-}
+### Correlation analysis {-}
 Now we need to assess which of these are correlated and thus may only provide redundant information. We will generate a correlation matrix, quantifying colinearity with Pearson's correlation coefficients.
 
 ```{r corel_OSP, fig.asp=1, fig.width=15}
@@ -614,7 +623,7 @@ pairs.panels(Data.sources[tracers], xaxt="n", yaxt="n", lm=TRUE, smoother=FALSE,
 
 The mean absolute Pearson's correlation coefficient for these data is `r mapcc`.
 
-## Effective Dimensionality {-}
+### Effective Dimensionality {-}
 Let's also quickly calculate the effective dimensionality of the dataset.
 ```{r ED_OSP}
 
@@ -624,7 +633,7 @@ ED$n1
 ```
 The effective dimensionaltiy of the dataset is `r ED$n1`.
 
-## Principal Components Analysis {-}
+### Principal Components Analysis {-}
 Now we will do a PCA to produce a 2-D visualization of how these groups separate in this multivariate parameter space.
  
 ```{r PCA_OSP}                       
@@ -666,7 +675,7 @@ ggarrange(p1,p2,p3,nrow=3,heights=c(1.2,1,1.5 ))
 PCA.all <- PCA.OSP
 ```
 
-## Linear Discriminant Analysis {-}
+### Linear Discriminant Analysis {-}
 Next we will carry out an LDA to see if that improves group separation.
 
 ```{r LDA_OSP}
@@ -749,7 +758,7 @@ ggarrange(p1,p2,p3,nrow=3,heights=c(1.2,1,1.5 ))
 
 ```
 
-# Just SAAs {-}
+## 2. Just SAAs {-}
 
 Now we'll run some of the same multivariate analyses but only looking at $\dNSAA$ values.
 ```{r select-SAAs}
@@ -802,7 +811,7 @@ AA_plots
 ```
   
   
-## Effective Dimensionality {-}
+### Effective Dimensionality {-}
 Let's also quickly calculate the effective dimensionality of the dataset.
 ```{r ED_OSP_SAAs}
 
@@ -812,7 +821,7 @@ ED$n1
 ```
 The effective dimensionaltiy of the dataset is `r ED$n1`.
   
-## Principal Components Analysis {-}
+### Principal Components Analysis {-}
 And a PCA to produce a 2-D visualization of how these groups separate in this multivariate parameter space.
  
 ```{r PCA_OSP_SAAs}                       
@@ -840,7 +849,7 @@ plot_ly(data=PCA.results, x=~Dim.1, y=~Dim.2, z=~Dim.3,
 PCA.SAA <- PCA.OSP
 ```
 
-## Linear Discriminant Analysis {-}
+### Linear Discriminant Analysis {-}
 Next we will carry out an LDA to see if that improves group separation.
 
 ```{r LDA_OSP_SAAs}
@@ -910,7 +919,7 @@ plot_ly(data=class.train, x=~LD1, y=~LD2, z=~LD3,
 
 
 
-# Select AA $\dN$ values {-}
+## 3. Select AA $\dN$ values {-}
 
 Now we'll run some of the same multivariate analyses but looking at a specific selection of amino acid $\dN$. Values. This is going to be Phe, Lys, and Thr, since these are the tracers used in the model.
 ```{r select-select}
@@ -962,7 +971,7 @@ AA_plots <-
 AA_plots
 ```
 
-## Effective Dimensionality {-}
+### Effective Dimensionality {-}
 Let's also quickly calculate the effective dimensionality of the dataset.
 ```{r ED_OSP_select}
 
@@ -972,7 +981,7 @@ ED$n1
 ```
 The effective dimensionaltiy of the dataset is `r ED$n1`.
   
-## Principal Components Analysis {-}
+### Principal Components Analysis {-}
 PCA to produce a 2-D visualization of how these groups separate in this multivariate parameter space.
  
 ```{r PCA_OSP_select, fig.width=7, fig.asp=0.8, dip=300}                       
@@ -1000,7 +1009,7 @@ plot_ly(data=PCA.results, x=~Dim.1, y=~Dim.2, z=~Dim.3,
 PCA.select <- PCA.OSP
 ```
 
-## Linear Discriminant Analysis {-}
+### Linear Discriminant Analysis {-}
 Next we will carry out an LDA to see if that improves group separation.
 
 ```{r LDA_OSP_select}
@@ -1068,7 +1077,7 @@ plot_ly(data=class.train, x=~LD1, y=~LD2, z=~LD3,
         marker = list(line = list(color = "1", width = 0.5)))
 ```
 
-# Summary Plots {-}
+## Summary Plots {-}
 
 Next we're going to generate some plots, summarizing how the our explanatory power changes as a function of the tracers included. To do this we'll try and plot results from PCAs and LDAs, paired with the variance explained by each dimension.
 
