@@ -1,0 +1,770 @@
+---
+title: "Organic Matter Supply Model: Assessing model performance using simulated data"
+author: "YOUR NAME HERE"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  #html_document: 
+  bookdown::html_document2:  
+    self-contained: yes
+    theme: cerulean #paper #cosmo #journal #readable
+    toc: true
+    smooth_scroll: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    fig_caption: yes
+    code_folding: hide
+bibliography: Utilities/MesoPelaZooAA.bib
+csl: Utilities/LnO.csl
+link-citations: yes
+---
+
+```{r setup, echo=FALSE, warning=FALSE}
+
+## This chunk sets up a working directory, loads packages, defines a couple functions, and sets global chunk options for the .Rmd document
+
+# clean up
+rm(list=ls()) 
+
+# fresh start? If FALSE (select 2 in hard bracket), will only rerun a chunk if 
+# changes are detected within the text of that chunk.
+rmCache <- c(TRUE, FALSE)[1] 
+tfn <- knitr::current_input()              # name of this file
+tfn <- substr(tfn, 1, nchar(tfn)-4)        # Remove the ".Rmd"
+tfn_cache <- paste0("Caches/", tfn, "_cache")         # Append "_cache" to it
+tfn_figures <- paste0("Figures/", tfn, "_figures")         # Append "_figures" to it
+if (rmCache) {
+  if (file.exists(tfn_cache))                # If the cache exists...
+    unlink(tfn_cache, recursive=TRUE)        # ...delete it.
+}
+
+# load packages quietly
+shhh <- suppressPackageStartupMessages # It's a library, so shhh!
+want <- c(
+  "knitr",
+  "readxl",          # For reading Excel files
+  "MASS",            # Statistical functions (e.g., LDA)
+  "vegan",           # Ecology statistics
+  "FactoMineR",      # PCA and utilities
+  "factoextra",      # Extra tools for FactoMineR
+  "runjags",         # Bayesian MCMC with JAGS
+  "TruncatedDistributions", # Truncated probability distributions
+  "coda",            # MCMC diagnostics
+  "DT",              # Sortable tables
+  "openxlsx",        # Excel writing
+  "compositions",    # Compositional data analysis
+  "kableExtra",      # Enhanced tables
+  "zeallot",         # Multiple assignment
+  "magrittr",        # Pipe operator
+  "DirichletReg",    # Dirichlet regression
+  "Ternary",         # Ternary plots
+  "png",             # PNG support
+  "ggplot2",         # Plotting
+  "ggpubr",          # Publication-ready plots
+  "ggstance",        # Vertical dodging
+  "ggtern",          # Ternary plots in ggplot2
+  "ggforce",         # Extra plotting features
+  "plotly",          # Interactive plots
+  "gridExtra",       # Grid layouts
+  "graphics",        # Base graphics
+  "reshape2"         # Data reshaping
+)
+for (pkg in want) shhh(library(pkg, character.only=TRUE))
+
+# set some chunk options
+gr <- (1+sqrt(5))/2 # golden ratio, for figures
+opts_chunk$set(comment="  ",
+               fig.asp=0.9/gr,       # <--- gr used here
+               fig.align="center",
+               fig.width=5,
+               # out.width="95%",
+               dpi=96, # set to 300 for important figures
+               dev="png", # png, svg, pdf, jpg, tiff
+               #echo=FALSE,
+               cache=c(TRUE, FALSE)[1], 
+               cache.path = paste0(tfn_cache,"/"),
+               fig.path = paste0(tfn_figures,"/"),
+               eval.after="fig.cap", # for dynamic captions
+               collapse=TRUE
+)
+
+## a couple of lines we need to run every time we knit
+# setting the ggplot theme
+theme_set(theme_classic2()+
+            theme(panel.grid.major.x = element_line(colour = "grey95"),
+                  panel.grid.major.y = element_line(colour = "grey95")))
+# defining a ggplot object to remove the x axis
+no.x.axis <- theme(axis.title.x=element_blank(),
+                   axis.text.x=element_blank(),
+                   axis.ticks.x=element_blank())
+# defining a ggplot object to remove the y axis
+no.y.axis <- theme(axis.title.y=element_blank(),
+                   axis.text.y=element_blank(),
+                   axis.ticks.y=element_blank())
+
+# Load custom functions (edit paths if relocated)
+source("Utilities/DBDA2E-utilities.R", local = c(TRUE, FALSE)[1])  # Kruschke’s utilities
+source("Functions/calcSDs.R")         # SDmean() and SDsum()
+source("Functions/Post_Mode.R")       # post.mode()
+source("Functions/OMSM_Gen_Model.R")  # Bayesian model generation
+source("Functions/Sim_Zoop.R")        # Zooplankton simulation
+source("Functions/OMSM_Extract_Posts.R") # OMSM posterior extraction
+source("Functions/OMSM_Plots.R")      # OMSM posterior plots
+source("Functions/OMSM_Data_Inits.R") # OMSM Datalist and Initlist
+source("Functions/OMSM_Post_Error.R") # Quantifying posterior error
+
+```  
+
+<!-- The following commands provide a shorthand for common symbols when used in math mode. -->
+\input{}
+
+\newcommand{\um}{\ \mu \mathrm{ m}}
+\newcommand{\mm}{\mathrm{\ mm}}
+\newcommand{\m}{\mathrm{\ m}}
+\newcommand{\N}{\mathrm{^{15}\text{N}}}
+\newcommand{\dN}{\mathrm{\delta^{15}\text{N}}}
+\newcommand{\dNAA}{\mathrm{\delta^{15}\text{N}_\text{AA}}}
+\newcommand{\dNSAA}{\mathrm{\delta^{15}\text{N}_\text{SAA}}}
+\newcommand{\dNTAA}{\mathrm{\delta^{15}\text{N}_\text{TAA}}}
+\newcommand{\dNtr}{\mathrm{\delta^{15}\text{N}_\text{tr}}}
+\newcommand{\dNsrc}{\mathrm{\delta^{15}\text{N}_\text{src}}}
+\newcommand{\dNphe}{\mathrm{\delta^{15}N_{phe}}}
+\newcommand{\dNthr}{\mathrm{\delta^{15}N_{thr}}}
+\newcommand{\dNala}{\mathrm{\delta^{15}N_{ala}}}
+\newcommand{\dNglx}{\mathrm{\delta^{15}N_{glx}}}
+\newcommand{\dNThrPhe}{\mathrm{\delta^{15}N_{thr-phe}}}
+\newcommand{\dNAlaPhe}{\mathrm{\delta^{15}N_{ala-phe}}}
+\newcommand{\dNglxphe}{\mathrm{\delta^{15}N_{glx-phe}}}
+\newcommand{\DN}{\mathrm{\Delta^{15}\text{N}}}
+\newcommand{\DNAA}{\mathrm{\Delta^{15}\text{N}_\text{AA}}}
+\newcommand{\C}{\mathrm{^{13}\text{C}}}
+\newcommand{\dC}{\mathrm{\delta^{13}\text{C}}}
+\newcommand{\dCAA}{\mathrm{\delta^{13}\text{C}_\text{AA}}}
+\newcommand{\dCEAA}{\mathrm{\delta^{13}\text{C}_\text{EAA}}}
+\newcommand{\dCNAA}{\mathrm{\delta^{13}\text{C}_\text{NAA}}}
+\newcommand{\permil}{‰}
+\newcommand{\degree}{°}
+\newcommand{\TP}{\mathrm{TP}}
+\newcommand{\TPala}{\mathrm{TP_{ala-phe}}}
+\newcommand{\TPglx}{\mathrm{TP_{glx-phe}}}
+\newcommand{\TPts}{\mathrm{TP_{tr-src}}}
+\newcommand{\dTP}{\mathrm{\Delta TP_{ala-glx}}}
+
+# Summary {-}  
+The purpose of this notebook is to visualize isotopic separation of organic matter sources in a particular setting, and then test the ability of an AA-CSIA-based food web model to diagnose the relative importance of those sources to a food web or higher order consumer using simulate data. The results here are diagnostic of the model's efficacy in a specific setting, and should be used to inform the interpretation of the food web model's output when applied to natural samples of consumers from that same environment.
+
+This notebook is composed of the following sections:
+
+### Sections: {-}
+1. **Setup**: Input data and parameters.
+2. **Source Separation**: Visualization of source distinction.
+3. **Data Simulation**: Generate synthetic zooplankton data.
+4. **Model Execution**: Fit the Bayesian model and run diagnostics.
+5. **Model Assessment**: Compare model outputs to simulation parameters.
+
+# Setup
+
+In the first few chunks, the user should enter all of the basic information that the model code will need to proceed with analysis. Lines of code requiring user attention will be indicated with `#!!!!#`.
+
+## Importing Data {-}
+First let's import the data. If you have not already, navigate to Data>OMSM_Data_Template.xlsx. Enter your data into this excel spreadsheet and then continue to the "Import_Data" chunk.
+
+If not using the template spreadsheet, ensure that your data file has the following qualities:
+
+- Rows for samples and columns for variables/tracers
+- One column identifying if each sample is a "source" or "consumer"
+- One column identifying which source group that sample belongs to
+- Columns for descriptive variables (optional)
+- Columns containing tracer values
+- Columns containing uncertainty in tracer values (must be >0)
+
+```{r Import_Data, eval=TRUE, fig.asp=0.6, out.width="100%"}
+
+## All data should be stored in one, single .xlsx file.
+## See OMSM_Data_Template.xlsx in Data folder for guidance on data formatting
+
+################################################################################
+## IMPORTING DATA ##
+# Define the location of .xlsx file, and sheet name if multiple sheets are  present.
+Data.all <-
+  read_excel(
+    "Data/OMSM_Data_Template.xlsx", #!!!!# ensure this path matches the location of your data
+    sheet = "Data")
+
+```
+
+We will export model results to a .Rdata file in the Data folder following analysis. Indicate the desired file name in the following chunk.
+
+```{r export_filename}
+export.file.name <- "OMSM_TEMPLATE_sim-zoops.Rdata"
+```
+
+## Identifying Tracers {-}
+Next we'll identify tracers to be included in the model and some key parameters on how to treat them. 
+
+```{r identifying_tracers}
+#### IDENTIFYING SOURCE AND DESCRIPTIVE VARIABLES ####
+
+########################## USER ATTENTION REQUIRED #############################
+# Indicate the name of the column describing whether a row in the data is a source or consumer sample.
+# This column will be renamed to "Type" if it isnt already
+Type.Variable <- "Type" #!!!!# If not using the supplied data template, change "Type" to match the appropriate column in your data spreadsheet
+################################################################################
+colnames(Data.all[Type.Variable]) <- "Type"
+
+
+
+
+########################## USER ATTENTION REQUIRED #############################
+# Indicate the name of the column describing the organic matter source to which each sample belongs.
+# This column will be renamed to "Source"
+Source.Variable <- "Source" #!!!!# If not using the supplied data template, change "Source" to match the appropriate column in your data spreadsheet
+################################################################################
+colnames(Data.all[Source.Variable]) <- "Source"
+
+
+
+
+########################## USER ATTENTION REQUIRED #############################
+# Indicate the names representing each possible source of organic matter to the food web/consumer.
+# These should match the names present in the Group column of your data.
+# The order of this vector will describe the order these groups are referenced in figures.
+# The model can accomodate 2-6 organic matter sources, but will need to be modified to accommodate more.
+Sources <- c("SOURCE","GROUP","NAMES") #!!!!# Enter the names of organic matter source groups to be included in this analysis
+################################################################################
+nsources <- length(Sources) # calculating number of source for convenience later
+
+
+
+
+########################## USER ATTENTION REQUIRED #############################
+# List the name of any additional variables that should be stored for analysis.
+# The data in these columns must be complete for all samples.
+Descriptive.Variables <- c("DESCRIPTIVE","VARIABLES") #!!!!# Enter the names of descriptive variables in your data set
+################################################################################
+Variables <- c("Type","Source", Descriptive.Variables)
+
+
+
+
+
+#### SPECIFYING TRACERS TO BE USED IN MODEL ####
+
+# Tracer names should match column names in the data spreadsheet
+# We'll store them in two lists
+Tracers <- list()   ## LEAVE THESE LISTS EMPTY ##
+SDTracers <- list() ## LEAVE THESE LISTS EMPTY ##
+
+
+
+
+
+########################## USER ATTENTION REQUIRED #############################
+# TRACERS FOR TROPHIC EQUATIONS
+# These tracers will not be used to solve mixing equations
+# FWL: Specify the name of the tracer that will estimate the full food web length
+Tracers$FWL <- c("TROPHIC TRACER FOR FOOD WEB LENGTH")
+SDTracers$FWL <- c("SD OF TROPHIC TRACER FOR FOOD WEB LENGTH")
+# MTS: Specify the name of the tracer that will estimate the number of metazoan trophic steps
+Tracers$MTS <- c("TROPHIC TRACER FOR FOOD WEB LENGTH")
+SDTracers$MTS <- c("TROPHIC TRACER FOR FOOD WEB LENGTH")
+################################################################################
+
+
+
+
+
+########################## USER ATTENTION REQUIRED #############################
+# TRACERS FOR MIXING EQUATIONS
+# Tracers for trophic equations must not be included in this list
+Tracers$mix <-c("MIXING","TRACER","VALUES")
+SDTracers$mix <-c("MIXING","TRACER","SDs")
+################################################################################
+
+
+
+
+
+########################## USER ATTENTION REQUIRED #############################
+# Specify the names for all tracers with constant trophic discrimination  and their uncertainty(i.e., TDF(protozoan) = TDF(metazoan))
+Tracers$constTDF <- c("CONSTANT","TDF","TRACER","VALUES")
+SDTracers$constTDF <- c("CONSTANT","TDF","TRACER","SDs")
+# Specify the names for all tracers with variable trophic discrimination  and their uncertainty(i.e., TDF(protozoan) != TDF(metazoan))
+Tracers$varTDF <- c("VARIABLE","TDF","TRACER","VALUES")
+SDTracers$varTDF <- c("VARIABLE","TDF","TRACER","SDs")
+# Specify the names for all conservative tracers and their uncertainty (i.e., no trophic discrimination is expected)
+Tracers$non <- c("CONSERVATIVE","TRACER","VALUES")
+SDTracers$non <- c("CONSERVATIVE","TRACER","SDs")
+################################################################################
+
+
+
+
+
+########################## USER ATTENTION REQUIRED #############################
+#### SPECIFYING CHOICES FOR TDF(PROTOZOAN) AND TDF(METAZOAN) ####
+# Note: default values are those used in Shea et al. (in prep)
+
+## What TDFs and SDs should be used to describe amino acid δ15N fractionation in metazoans?
+## Note that these TDFs should NOT be normalized to any source amino acid.
+TDF_meta <- data.frame("d15NAla" = 6.3, "SDd15NAla" = 2.6,
+                       "d15NGly" = 2.9, "SDd15NGly" = 3.1,
+                       "d15NThr" =-5.9, "SDd15NThr" = 1.5,
+                       "d15NSer" = 2.6, "SDd15NSer" = 3.2,
+                       "d15NVal" = 4.4, "SDd15NVal" = 2.6,
+                       "d15NLeu" = 5.6, "SDd15NLeu" = 2.4,
+                       "d15NIle" = 5.5, "SDd15NIle" = 2.4,
+                       "d15NPro" = 5.8, "SDd15NPro" = 1.7,
+                       "d15NAsx" = 5.7, "SDd15NAsx" = 1.9,
+                       "d15NMet" = 1.6, "SDd15NMet" = 2.6,
+                       "d15NGlx" = 8.0, "SDd15NGlx" = 1.7,
+                       "d15NPhe" = 0.3, "SDd15NPhe" = 0.5,
+                       "d15NTyr" = NA , "SDd15NTyr" = NA,
+                       "d15NLys" = 1.2, "SDd15NLys" = 1.2)
+
+## What TDFs and SDs should be used to describe amino acid δ15N fractionation in protozoans?
+# Note that these TDFs should NOT be normalized to any source amino acid.
+TDF_proto = data.frame("d15NAla" = 6.3, "SDd15NAla" = 2.6,
+                       "d15NGly" = 2.9, "SDd15NGly" = 3.1,
+                       "d15NThr" =-2.0, "SDd15NThr" = 0.6,
+                       "d15NSer" = 2.6, "SDd15NSer" = 3.2,
+                       "d15NVal" = 0.7, "SDd15NVal" = 1.6,
+                       "d15NLeu" = 1.4, "SDd15NLeu" = 0.6,
+                       "d15NIle" =-0.5, "SDd15NIle" = 2.7,
+                       "d15NPro" = 5.8, "SDd15NPro" = 1.7,
+                       "d15NAsx" = 0.8, "SDd15NAsx" = 1.4,
+                       "d15NMet" = NA , "SDd15NMet" = NA ,
+                       "d15NGlx" = 0.5, "SDd15NGlx" = 1.0,
+                       "d15NPhe" = 0.3, "SDd15NPhe" = 0.5,
+                       "d15NTyr" = NA , "SDd15NTyr" = NA,
+                       "d15NLys" = 1.2, "SDd15NLys" = 1.2)
+################################################################################
+
+
+
+
+
+## Making some master lists of tracers - no changes necessary here ##
+# All tracers
+Tracers$all <- 
+  c(
+    Tracers$constTDF,
+    Tracers$varTDF,
+    Tracers$non
+  )
+SDTracers$all <- 
+  c(
+    SDTracers$constTDF,
+    SDTracers$varTDF,
+    SDTracers$non
+  )
+# Tracers that fractionate
+Tracers$frac <- 
+  c(
+    Tracers$constTDF,
+    Tracers$varTDF
+  )
+SDTracers$frac <- 
+  c(
+    SDTracers$constTDF,
+    SDTracers$varTDF
+  )
+# Ensuring that trophic tracers are not also mixing tracers
+if(sum(Tracers$mix %in% c(Tracers$FWL,Tracers$MTS)) > 0) {
+  stop("Trophic tracers should not be included in the list of mixing tracers.")
+}
+# Tracers that fractionate and will be used to fit the model
+Tracers$mixfrac <- 
+  Tracers$mix[which(Tracers$mix %in% Tracers$frac)]
+SDTracers$mixfrac <- 
+  SDTracers$mix[which(SDTracers$mix %in% SDTracers$frac)]
+# we also need to bypass all multivariate analyses if <3 tracers
+runMV <- TRUE
+if(length(Tracers$mix) < 3){
+  runMV <- FALSE
+}
+
+# Define the Order you would like tracers referenced in, if any
+Order <- c("TRACER","VALUE","NAMES","IN","PREFERRED","ORDER")
+SDOrder <- c("TRACER","SD","NAMES","IN","PREFERRED","ORDER")
+
+# If all tracers used aren't specified in the Order vector then it will be redefined
+if(length(which(Order %in% Tracers$all))<length(Tracers$all)){
+  Order <- Tracers$all
+  SDOrder <- SDTracers$all
+}
+
+```
+
+## Processing Data {-}
+
+The next thing we will do is process the data. We will automatically remove any samples for which the data is incomplete.
+
+We can also programmatically define source groups based on quantitative criteria or identify samples we would like to exclude .
+
+```{r Proccess_Data, eval=TRUE, fig.asp=0.6, out.width="100%"}
+
+#### Retaining only columns for variables defined in the above chunk ####
+Data.all <- Data.all[c(Variables,Tracers$all,SDTracers$all)]
+
+#### Removing samples with incomplete data ####
+Data.all <- na.omit(Data.all)
+
+#### Isolating organic matter source data ####
+## Organic matter source data will be stored in a separate data frame
+Data.sources <- subset(Data.all, Type == "Source")
+
+########################## USER ATTENTION REQUIRED #############################
+#### Programatically defining organic matter source groups ####
+## would you like to programatically define organic matter source groups?
+## if so set to TRUE
+if(FALSE){
+  # replacing the Source column with NAs
+  Data.sources$Source <- factor(NA, levels = Sources)
+  # construct criteria to categorize source groups based on descriptive variables
+  # see OMSM_ALOHA_sim-zoops for examples
+  Data.sources <- subset(Data.sources, !is.na(Source))
+}
+
+
+# Defining the preferred Order in which to reference organic matter sources
+Data.all$Source <- factor(Data.all$Source, levels = c(Sources,"Consumer"))
+
+# To define the order that specific descriptive variables should be referenced, adapt the below example.
+# Data.all["Size"] <- factor(Data.all[["Size"]], levels = c(
+#   c("0.3-1 μm", "1-5 μm", "1-6 μm", "6-51 μm", ">51 μm", "Sediment Trap",
+#   "0.2-0.5 mm", "0.5-1.0 mm", "1-2 mm", "2-5 mm", ">5 mm")
+# ))
+# 
+```
+
+The remainder of the code in this R Markdown document should now run without alteration, though additional diagnostics can be activated throughout by uncommenting lines of code where indicated.
+
+# Source Separation
+
+First lets visualize the value of each tracer in each organic matter source.
+
+```{r Tracer_Plots_Sources, fig.asp=0.4, fig.width=8.5}
+
+plot_sources(Data.sources, Tracers)
+
+```
+
+Next, to visualize the between group patterns in the data we will do some multivariate analyses. We'll start by carrying out a PCA. This should give us a decent of idea of what kind of if between-group separation is a major component of variation in this data set. It will also help us visualize which tracers are driving separation between certain organic matter sources and which are providing redundant information.
+
+```{r PCA_sources, fig.asp=0.6, fig.width=5, eval=runMV}
+# Fitting PCA and adding Sample and Type as a supplemental qualitative variable
+PCA = PCA(Data.sources[c(Variables,Tracers$mix)], scale.unit = FALSE, quali.sup = Variables, graph = FALSE)
+
+# ## Uncomment these lines to see some diagnostics of how the PCA ran
+# # Plot component variance
+# fviz_eig(PCA, addlabels = FALSE, geom = "bar")
+# 
+# # Print a summary of the PCA results
+# summary(PCA)
+
+plot_sources_PCA(PCA, Data.sources)
+
+```
+
+We'll also fit an LDA since we will use this later to visualize zooplankton samples in our mixing space.
+
+```{r LDA_sources, fig.asp=0.8, fig.width=5, eval = runMV}
+if(runMV == TRUE & length(Sources >2)){
+  ntypes = nlevels(as.factor(Data.sources[["Source"]]))
+  # fitting the model with leave one out cross validation
+  LDA.test = lda(Source ~ . ,data = Data.sources[c("Source",Tracers$mix)], CV = TRUE,
+                 prior = rep(1/ntypes, ntypes))
+  
+  
+  
+  # ## uncomment these lines to see the results of leave one out cross-validation 
+  # ## and see some LDA model diagnostics
+  # print model result
+  # LDA.train
+  
+  # # create a table which compares the classification of the LDA model to the actual producer type
+  # ct.prod.norm <- table(Data.sources[["Source"]], 
+  #                       LDA.test$class)
+  # # total percent of samples correctly classified is the sum of the diagonal of this table
+  # noquote(c('% successfully categorized: ', sum(diag(prop.table(ct.prod.norm)))))
+  
+  
+  
+  # Refitting the model using all of the available training data
+  LDA.full = lda(Source ~ . ,data = Data.sources[c("Source",Tracers$mix)], CV = FALSE, prior = rep(1/ntypes, ntypes))
+  
+  ## uncomment this line to see a summary of the full LDA
+  # LDA.full
+  
+  # store locations of training data in LD space for later plotting
+  pred.train = predict(LDA.full, Data.sources[Tracers$mix])
+  class.train = data.frame("Source" = Data.sources[["Source"]], pred.train$x)
+  
+  
+  plot_sources_LDA(class.train)
+}
+```
+
+# Data Simulation
+
+Next we will simulate some consumer data as a way to test the efficacy of the model under different ecological scenarios. We will choose ecological parameters and use the same TDFs that will be supplied to the food web model so that we can test how well the model reproduces these these known values. If the organic matter source data provides adequate separation of mixing end members and the sources of uncertainty are well enough constrained then the model should return parameters similar to those defined in the following chunk.
+
+By default, the following chunk simulates 50 consumer samples with random mixing coefficients. Trophic parameters will be selected at random, with 0-1 protistan trophic steps and 1-2 metazoan trophic steps. 
+
+
+```{r SimZoop, eval=TRUE, fig.asp=0.6}
+
+## Sim_Zoop uses the exact same TDFs, and makes the same assumptions about conservative
+## and fractionating tracers, as defined in the identifying_tracers chunk
+
+## Sim_Zoop_RealPhe uses 0.3‰ trophic discrimination in Phe to simulate zooplankton
+## data even if the model will assume it is conservative.
+
+Sim_Zoop( # use this if treating Phe as a fractionating tracer in the model
+  # Sim_Zoop_RealPhe( # use this if treating Phe as a conservative tracer in the model
+  Random_Samples = TRUE,
+  nzoops = 50, # If Random_Samples = TRUE define number of samples
+  incr = 0.2, # if Random_Samples = FALSE define spacing of samples in compositional space
+  PTS = c(0,0.5,1), # If Random_Samples = TRUE, random values for PTS between min and max in this vector are generated
+  # If Random_samples = FALSE, samples are generated at all PTS values given
+  MTS = c(1,1.5,2), # If Random_Samples = TRUE, random values for MTS between min and max in this vector are generated
+  # If Random_samples = FALSE, samples are generated at all MTS values given
+  TDF_m = TDF_meta[Tracers$frac], # trophic discrimination factors
+  TDF_p = TDF_proto[Tracers$frac], # trophic discrimination factors
+  Sources = Sources,
+  Data.sources = Data.sources,
+  Tracers = Tracers,
+  Variables = Variables,
+  disperse = 0.5, # increasing the dispersion parameter above 0 allows basal mixture to fall slightly outside of the isotope mixing space bounded by the means of the organic matter source groups, making the data slightly more realistic.
+  seed = 000 # set the seed for repeatability
+)
+```
+
+## Plotting Simulated Data {-}
+Let's plot out the tracer values of organic matter sources and zooplankton.
+
+```{r Tracers_Zoops.plots, dpi=300, fig.asp=0.3, fig.width=8}
+
+plot_Source_Consumer_Sim(
+  Data.sources,
+  Data.zoops,
+  base.sim,
+  Tracers, 
+  LDA.full)
+
+```
+
+# Model Execution
+Next, we will use Markov Chain Monte Carlo to find PDFs describing the most likely solutions to our mixing problem. We will write a BUGS model, then use JAGS to do the MCMC.
+
+## Setting up for MCMC {-}
+
+Organizing the input data for MCMC.
+```{r datalist, eval=TRUE}
+
+Data.OMSM <- 
+  OMSM_Datalist(
+    Data.sources, 
+    Data.zoops, 
+    Sources, 
+    Tracers, 
+    TDF_meta, 
+    TDF_proto
+    )
+  
+```
+and defining our initial values.
+```{r initlist, eval=TRUE}
+Inits.OMSM <- 
+  OMSM_Initlist(
+    seed = 222,
+    Nchains = 3,
+    nzoops,
+    nsources,
+    length(Tracers$all)
+    )
+```
+
+## Drafting a BUGS model {-}
+Now we'll define our BUGS model.
+
+```{r OMSM}
+# Generate the BUGS model. No edits typically needed unless modifying model structure.
+
+OMSM <- 
+  OMSM_Gen_Model(
+    nsources, 
+    Data.OMSM
+    )
+
+```
+
+## Running MCMC in JAGS {-}
+Now we can run the MCMC!
+
+```{r runjags, eval=TRUE}
+samsPerChain <- 1000 # needed  below for narrative, so we give it a name.
+monitor_vars = c("mean_b", "mean_z",
+                 "TDF_meta", "sdTDF_m",
+                 "TDF_proto","sdTDF_p",
+                 "pz"       , "FWL"  , "PTS", "MTS",
+                 c("mean_A", "mean_B", "mean_C", "mean_D", "mean_E", "mean_F")[1:length(Sources)],
+                 c("sd_A", "sd_B", "sd_C", "sd_D", "sd_E", "sd_F")[1:length(Sources)]
+)
+
+rjo_1 <- # S3 object of class "runjags"
+  run.jags(model = OMSM,
+           data = Data.OMSM,
+           inits = Inits.OMSM,
+           silent.jags = FALSE,
+           n.chains = Nchains,
+           adapt  = 5000,
+           burnin = 10000,
+           thin = 10,
+           sample = samsPerChain,
+           method = "parallel",
+           modules = "glm",
+           monitor = monitor_vars
+  )
+```
+
+## Diagnostics {-} 
+Here we run some diagnostics. Initially we use John K. Kruschke's function `diagMCMC` to check out model parameters and make sure things are running properly. When these diagnostics look good, we set `eval=FALSE` in the chunk header and make nicer parameter plots comparing known parameter values and the MCMC posteriors for those parameters, which is seen below.
+
+```{r diagMu, eval=FALSE, fig.cap="Means of tracers 1 and 2 for prey types A,B,C."}
+## Kruschke's utility functions (edited by NF)
+# edit "parname" to print additional parameter diagnostics as desired
+# numbers in hard brackets pertain to samples and tracers
+if (c(TRUE,FALSE)[1]) source("Utilities/DBDA2E-utilities.R") 
+diagMCMC(rjo_1$mcmc, parName="FWL[1]")
+diagMCMC(rjo_1$mcmc, parName="MTS[1]")
+diagMCMC(rjo_1$mcmc, parName="PTS[1]")
+diagMCMC(rjo_1$mcmc, parName="pz[1,1]")
+diagMCMC(rjo_1$mcmc, parName="pz[1,2]")
+diagMCMC(rjo_1$mcmc, parName="pz[1,3]")
+# diagMCMC(rjo_1$mcmc, parName="pz[1,4]")
+diagMCMC(rjo_1$mcmc, parName="mean_z[1,9]")
+
+```  
+
+# Model Assessment
+Now let's gather up posteriors from the OMSM and plot those relative to the tue values we used to simulate the data to get an idea for how the model is performing.
+
+```{r Posterior_extraction, message=FALSE}
+
+OMSM_Extract_Posts(
+  rjo_1 = rjo_1,
+  Data.zoops = Data.zoops,
+  Sources,
+  Variables,
+  Tracers
+)
+
+```
+
+## Source tracer values {-}
+
+First we'll generate some plots of the mean source tracer value posteriors ($\mu_{j,i}$) relative to the original source data.
+
+```{r source_tracer_comparisons, dpi=500, fig.asp=0.4, fig.width=8.5}
+
+plot_sourcepost_sim(posts.long, Data.sources, Tracers)
+
+```
+
+## Basal tracer values {-}
+
+Now let's generate plots of the MCMC posteriors for the zooplankton sample-specific parameters. We'll want to plot the model posteriors for the tracer values at the base of the food web. We'll do this for all the individual tracers, but also try and visualize the multivariate patterns using LDA. Note that trophic and mixing tracers are plotted on the left, though trophic tracers were not used to fit the mixing model and are not included in LDA on the right.
+
+```{r posterior_base_comparison, dpi=300, fig.asp=0.4, fig.width=8.5}
+
+plot_basepost_sim(posts, posts.long, Data.sources, Data.zoops, base.sim, Tracers, Variables, LDA.full)
+
+```
+
+## Consumer tracer values {-}
+
+We also want to look at the mean_z parameter for each zooplankton sample to see if and where the posteriors for mixing tracers are deviating from the data. If they are, that means either the TDFs are not accurate or there is a missing organic mater source.
+
+```{r posterior_zoop, dpi=300, fig.asp=0.6, fig.width=8.5}
+
+plot_zooppost_sim(
+  posts.long,  
+  Data.zoops, 
+  Data.sources,
+  base.sim,
+  Tracers
+)
+
+```
+
+## Trophic parameters {-}
+
+We also want to plot comparisons of the trophic parameters used to simulate the zooplankton data and the model posteriors for those parameters. Posterior HDIs (95%, 90%, 75%, and 50%) are shown in blue bars, with posterior modes indicated with text. True values are indicated by yellow lines. Righthand plots show relationships between true and modeled values, with discrepancy plots showing the difference between modeled and true values.
+
+```{r posterior_trophic_comparison, dpi=300, fig.asp=0.5, fig.width=8.5, cache=FALSE}
+
+plot<-
+plotall_trophicpost_sim(posts, zoops.f)
+plot
+
+```
+
+We'll briefly quantify model error as well by looking at the discrepancy between modeled and true trophic parameter values. Expand the code chunk to see the mean and maximum error rates for each parameter.
+
+```{r error-quantification-trophic, warning=FALSE}
+Post_Error_Quant_Trophic(
+  zoops.f,
+  posts
+)
+
+plot_Post_Error_Trophic(
+  zoops.f,
+  posts
+)
+```
+
+## Mixing coefficients {-}
+
+Last we'll do the same for mixing coefficients.
+```{r} 
+aspect = length(Sources)/6
+```
+
+```{r posterior_f_comparisons, eval=TRUE, dpi=300, fig.width=8.5, fig.asp=aspect, cache=FALSE}
+
+plot <- plotall_fpost_sim(posts, zoops.f, Sources)
+plot
+
+```
+
+We'll also quantify model accuracy for mixing coefficients. Expand the code chunk to see the mean and maximum error rates for each source.
+
+```{r error-quantification-mixing, warning=FALSE}
+Post_Error_Quant_f(
+    zoops.f,
+    posts
+)
+
+plot_Post_Error_f(
+    zoops.f,
+    posts,
+    Sources
+)
+```
+
+# Exporting results {-}
+
+The last thing we want to do here is export out mixing model results to a .RData file. Load this file into other R scripts to do additional analyses.
+
+```{r export-results, eval=TRUE}
+save(posts,
+     posts.long,
+     Data.all,
+     zoops.sim,
+     file = paste0("Data/",export.file.name))
+```
+
+
+
