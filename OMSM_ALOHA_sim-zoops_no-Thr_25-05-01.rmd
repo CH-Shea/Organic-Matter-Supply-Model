@@ -183,6 +183,12 @@ Data.all <-
 
 ```
 
+We will export model results to a .Rdata file in the Data folder following analysis. Indicate the desired file name in the following chunk.
+
+```{r export_filename}
+export.file.name <- "ALOHAsim_OMSM_no-Thr_posteriors.RData"
+```
+
 ## Identifying Tracers {-}
 Next we'll identify tracers to be included in the model and some key parameters on how to treat them. Here we'll be using $\dN$ values of Phe and Lys. We'll be treating Phe as a conservative tracer.
 
@@ -786,7 +792,7 @@ save(posts,
      posts.long,
      Data.all,
      zoops.sim,
-     file = "Data/ALOHAsim_OMSM_no-Thr_posteriors.RData")
+     file = paste0("Data/",export.file.name))
 ```
 
 # Comparing to model results including Thr {-}
