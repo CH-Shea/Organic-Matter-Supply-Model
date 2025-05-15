@@ -7,7 +7,7 @@ Follow these steps to run the code.
 3. Open the R Project file titled "Organic-Matter-Supply-Model.Rproj".
 4. To insure all necessary r packages are installed, navigate to the console and run the following command:
       > source("install_packages.R")
-   The necessary packages to knit any of the .rmd files should now be installed.
+      > # The necessary packages to knit any of the .rmd files should now be installed.
 5. Open and run/knit any of the included .rmd files.
 
 OMSM_ALOHA_sim-zoops....rmd files contain OMSM model runs using simulated zooplankton data based on AA-CSIA data from particles collected at Station ALOHA. These documents rely on many functions stored in the "Functions" and "Utilities" folders.
