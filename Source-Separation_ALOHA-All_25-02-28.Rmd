@@ -27,7 +27,7 @@ rm(list=ls())
 
 # fresh start? If FALSE (select 2 in hard bracket), will only rerun a chunk if 
 # changes are detected within the text of that chunk.
-rmCache <- c(TRUE, FALSE)[2]
+rmCache <- c(TRUE, FALSE)[1]
 tfn <- knitr::current_input()              # name of this file
 tfn <- substr(tfn, 1, nchar(tfn)-4)        # Remove the ".Rmd"
 tfn_cache <- paste0("Caches/", tfn, "_cache")         # Append "_cache" to it
@@ -39,34 +39,23 @@ if (rmCache) {
 
 # load packages quietly
 shhh <- suppressPackageStartupMessages # It's a library, so shhh!
-want <- c("knitr", 
-          "readxl", # for reading xl files
-          "MASS", # some statistics including lda
-          "vegan", # ecology statistics
-          "FactoMineR", # includes PCA function and utilities
-          "factoextra", # extra utilities for FactoMineR
-          "runjags", # To run Bayesian models
-          "TruncatedDistributions", # To generate truncate porbability distributions
-          "coda",  
-          "DT", # makes nice sortable tables
-          "openxlsx", # writes to .xlsx files
-          "compositions", 
-          "kableExtra",
-          "zeallot", 
-          "magrittr", 
-          "DirichletReg", 
-          "Ternary", 
-          "png",
-          "ggplot2",
-          "ggpubr",
-          "ggstance", # for vertical position dodging
-          "ggtern", # for ternary plots in ggplot2
-          "ggforce", # for specific extra plotting capabilities (facet_row())
-          "plotly",
-          "gridExtra",
-          "graphics",
-          "reshape2",
-          "psych"
+want <- c("knitr",             # Renders R Markdown document, manages chunks and outputs
+          "readxl",            # Reads Excel files for importing particle and zooplankton data
+          "MASS",              # Performs linear discriminant analysis (LDA) for group separation
+          "vegan",             # Runs PERMANOVA for multivariate comparison of sources
+          "FactoMineR",        # Conducts principal component analysis (PCA) for dimensionality reduction
+          "factoextra",        # Visualizes PCA results with eigenvalues and biplots
+          "DT",                # Creates interactive HTML tables for data display
+          "kableExtra",        # Formats tables for enhanced presentation
+          "magrittr",          # Provides pipe operator (%>%) for chaining data operations
+          "ggplot2",           # Generates plots for visualizing δ¹⁵N and source comparisons
+          "ggpubr",            # Sets ggplot2 themes and arranges multiple plots
+          "ggforce",           # Enables faceted plotting for amino acid visualizations
+          "plotly",            # Creates interactive 3D scatter plots for PCA and LDA results
+          "gridExtra",         # Arranges multiple LDA biplots for comparison
+          "graphics",          # Produces base R plots for Tukey’s test visualizations
+          "reshape2",          # Reshapes data for plotting and analysis
+          "psych"              # Computes correlation matrices for tracer collinearity
           )
 for (pkg in want) shhh(library(pkg, character.only=TRUE))
 

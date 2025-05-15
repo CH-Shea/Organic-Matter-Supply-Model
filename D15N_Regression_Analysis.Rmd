@@ -25,7 +25,7 @@ rm(list=ls())
 
 # fresh start? If FALSE (select 2 in hard bracket), will only rerun a chunk if 
 # changes are detected within the text of that chunk.
-rmCache <- c(TRUE, FALSE)[2]
+rmCache <- c(TRUE, FALSE)[1]
 tfn <- knitr::current_input()              # name of this file
 tfn <- substr(tfn, 1, nchar(tfn)-4)        # Remove the ".Rmd"
 tfn_cache <- paste0("Caches/", tfn, "_cache")         # Append "_cache" to it
@@ -37,34 +37,14 @@ if (rmCache) {
 
 # load packages quietly
 shhh <- suppressPackageStartupMessages # It's a library, so shhh!
-want <- c("knitr", 
-          "readxl", # for reading xl files
-          "MASS", # some statistics including lda
-          "vegan", # ecology statistics
-          "FactoMineR", # includes PCA function and utilities
-          "factoextra", # extra utilities for FactoMineR
-          "runjags", # To run Bayesian models
-          "TruncatedDistributions", # To generate truncate porbability distributions
-          "coda",  
-          "DT", # makes nice sortable tables
-          "openxlsx", # writes to .xlsx files
-          "compositions", 
-          "kableExtra",
-          "zeallot", 
-          "magrittr", 
-          "DirichletReg", 
-          "Ternary", 
-          "png",
-          "ggplot2",
-          "ggpubr",
-          "ggstance", # for vertical position dodging
-          "ggtern", # for ternary plots in ggplot2
-          "ggforce", # for specific extra plotting capabilities (facet_row())
-          "plotly",
-          "gridExtra",
-          "graphics",
-          "reshape2",
-          "psych"
+want <- c("knitr",             # Renders R Markdown documents, manages chunks and outputs
+          "readxl",            # Reads Excel files (.xlsx) for data import
+          "DT",                # Creates interactive, sortable HTML tables
+          "openxlsx",          # Writes data to Excel files with formatting
+          "magrittr",          # Provides pipe operators (%>%) for chaining operations
+          "ggplot2",           # Creates customizable plots for data visualization
+          "ggpubr",            # Extends ggplot2 with themes and simplified plotting
+          "reshape2"           # Reshapes data between wide and long formats for analysis
           )
 for (pkg in want) shhh(library(pkg, character.only=TRUE))
 
