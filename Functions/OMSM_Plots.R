@@ -148,7 +148,7 @@ plot_sourcepost_sim <- function(
     ggplot()+
     geom_density(data = posts.long$source$samples[
       which(posts.long$source$samples$Tracer %in% Tracers$mix),],
-      aes(x=Value, fill=Source), alpha=0.8, color="grey10", size=0.5)+
+      aes(x=Value, fill=Source), alpha=0.8, color="grey10", linewidth=0.5)+
     geom_point(data=Sources.long[
       which(Sources.long$Tracer %in% Tracers$mix),],
       aes(x=Value, y=0, fill=Source, shape = "Source Data"),
@@ -259,7 +259,7 @@ plot_basepost_sim <- function(
            alpha = "True Value",
            shape = "Organic Matter Source"
       )+
-      guides(color=FALSE)
+      guides(color="none")
     output2 <-
       ggarrange(AAplots, plot.mix.LD12, ncol = 2, widths = c(2, 1.5),
                 common.legend = TRUE, legend = "left")

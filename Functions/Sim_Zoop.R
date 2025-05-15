@@ -96,7 +96,7 @@ Sim_Zoop <- function(
   par(mar=rep(2, 4))
   hist(zoops.f$PTS, main = "Protistan Trophic Steps")
   hist(zoops.f$MTS, main = "Metazoan Trophic Steps")
-  print(datatable(round(zoops.f,2)))
+  # print(datatable(round(zoops.f,2)))
   
   ## calculating the tracer values after mixing, before any trophic discrimination
   # calculating the mean tracer value for each organic matter source group
@@ -283,7 +283,7 @@ Sim_Zoop_RealPhe <- function(
   par(mar=rep(2, 4))
   hist(zoops.f$PTS, main = "Protistan Trophic Steps")
   hist(zoops.f$MTS, main = "Metazoan Trophic Steps")
-  print(datatable(round(zoops.f,2)))
+  # print(datatable(round(zoops.f,2)))
   
   ## calculating the tracer values after mixing, before any trophic discrimination
   # calculating the mean tracer value for each organic matter source group
@@ -469,7 +469,7 @@ Sim_Zoop_RealPheLys <- function(
   par(mar=rep(2, 4))
   hist(zoops.f$PTS, main = "Protistan Trophic Steps")
   hist(zoops.f$MTS, main = "Metazoan Trophic Steps")
-  print(datatable(round(zoops.f,2)))
+  # print(datatable(round(zoops.f,2)))
   
   ## calculating the tracer values after mixing, before any trophic discrimination
   # calculating the mean tracer value for each organic matter source group
@@ -655,7 +655,7 @@ Sim_Zoop_RealSAAs <- function(
   par(mar=rep(2, 4))
   hist(zoops.f$PTS, main = "Protistan Trophic Steps")
   hist(zoops.f$MTS, main = "Metazoan Trophic Steps")
-  print(datatable(round(zoops.f,2)))
+  # print(datatable(round(zoops.f,2)))
   
   ## calculating the tracer values after mixing, before any trophic discrimination
   # calculating the mean tracer value for each organic matter source group

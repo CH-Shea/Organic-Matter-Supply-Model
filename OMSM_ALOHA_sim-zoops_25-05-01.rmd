@@ -569,6 +569,8 @@ Sim_Zoop_RealPhe( # use this if treating Phe as a conservative tracer in the mod
   disperse = 0.5,
   seed = 000
 )
+
+datatable(Data.zoops)
 ```
 
 ## Plotting Simulated Data {-}

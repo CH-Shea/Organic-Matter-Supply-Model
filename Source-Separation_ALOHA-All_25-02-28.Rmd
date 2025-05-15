@@ -512,7 +512,7 @@ We'll wan to calculate Person's correlation coefficients for all tracer pairs, a
 
 ## 1. All Tracers {-}
 
-Here's the data we are able to work with for these sources of organic matter at Station Papa.
+Here's the data we are able to work with for these sources of organic matter.
 
 ```{r data}
 kable(Data.sources, format="pipe")
