@@ -41,33 +41,22 @@ if (rmCache) {
 # load packages quietly
 shhh <- suppressPackageStartupMessages # It's a library, so shhh!
 want <- c(
-  "knitr",
-  "readxl",          # For reading Excel files
-  "MASS",            # Statistical functions (e.g., LDA)
-  "vegan",           # Ecology statistics
-  "FactoMineR",      # PCA and utilities
-  "factoextra",      # Extra tools for FactoMineR
-  "runjags",         # Bayesian MCMC with JAGS
-  "TruncatedDistributions", # Truncated probability distributions
-  "coda",            # MCMC diagnostics
-  "DT",              # Sortable tables
-  "openxlsx",        # Excel writing
-  "compositions",    # Compositional data analysis
-  "kableExtra",      # Enhanced tables
-  "zeallot",         # Multiple assignment
-  "magrittr",        # Pipe operator
-  "DirichletReg",    # Dirichlet regression
-  "Ternary",         # Ternary plots
-  "png",             # PNG support
-  "ggplot2",         # Plotting
-  "ggpubr",          # Publication-ready plots
-  "ggstance",        # Vertical dodging
-  "ggtern",          # Ternary plots in ggplot2
-  "ggforce",         # Extra plotting features
-  "plotly",          # Interactive plots
-  "gridExtra",       # Grid layouts
-  "graphics",        # Base graphics
-  "reshape2"         # Data reshaping
+  "knitr",           # For R Markdown document knitting
+  "readxl",          # For reading Excel data files
+  "MASS",            # For linear discriminant analysis
+  "FactoMineR",      # For principal component analysis
+  "factoextra",      # For PCA visualization
+  "runjags",         # For Bayesian MCMC with JAGS
+  "coda",            # For MCMC diagnostics
+  "DT",              # For interactive data tables
+  "ggplot2",         # For creating plots
+  "ggpubr",          # For publication-ready plots
+  "gridExtra",       # For arranging multiple plots
+  "reshape2",        # For data reshaping
+  "magrittr",        # For pipe operator
+  "compositions",    # For compositional data analysis
+  "DirichletReg",    # For Dirichlet regression
+  "Ternary"          # For creating ternary plots
 )
 for (pkg in want) shhh(library(pkg, character.only=TRUE))
 
