@@ -89,9 +89,9 @@ plot_Source_Consumer_Sim <- function(
   
   AA_plots <- ggplot(Sources.long) +
     geom_point(aes(x = Tracer, y = Value, color = Source, shape = Source), alpha = 0.6,
-               position = position_nudge(x = 0.1)) +
+               position = position_nudge(x = 0.2)) +
     geom_point(data = Zoops.long, aes(x = Tracer, y = Value, fill = "Zooplankton"),
-               color = "black", shape = 17, position = position_nudge(x = -0.1)) +
+               color = "black", shape = 17, position = position_nudge(x = -0.2)) +
     geom_point(data = Base.long, aes(x = Tracer, y = Value, fill = "Food Web Base"),
                color = "brown", shape = 16, position = position_nudge(x = 0)) +
     ylab(expression(delta^{15}*N*" (\u2030)")) +
@@ -110,7 +110,7 @@ plot_Source_Consumer_Sim <- function(
     
     plot.mix.LD12 <- 
       ggplot(class.train, aes(x = LD2, y = LD1, color = Source, shape = Source)) +
-      geom_point(alpha = 0.6) +
+      geom_point(alpha = 0.8) +
       stat_ellipse(type = "t", alpha = 0.6) +
       geom_point(data = class.base, aes(x = LD2, y = LD1, fill = "Food Web Base"),
                  color = "brown", shape = 16) +
@@ -588,7 +588,7 @@ plotall_trophicpost_sim <- function(
       data.truemod.long = data.truemod.long,
       Ymax = Ymax)
   for (i in seq(1,2)) {
-    plot_list2[[i]] <- plot_list2[[i]] + no.x.axis
+    plot_list2[[i]] <- plot_list2[[i]] + theme(axis.title.x = element_blank())
   }
   for (i in seq(1,3)) {
     plot_list2[[i]] <- plot_list2[[i]] + theme(axis.title.y = element_blank())
@@ -600,7 +600,7 @@ plotall_trophicpost_sim <- function(
       data.truemod.long = data.truemod.long,
       Ymax = Ymax)
   for (i in seq(1,2)) {
-    plot_list3[[i]] <- plot_list3[[i]] + no.x.axis
+    plot_list3[[i]] <- plot_list3[[i]] + theme(axis.title.x = element_blank())
   }
   for (i in seq(1,3)) {
     plot_list3[[i]] <- plot_list3[[i]] + theme(axis.title.y = element_blank())
@@ -608,18 +608,18 @@ plotall_trophicpost_sim <- function(
   
   col1<-
     ggarrange(
-      plot.PTS + no.x.axis, 
-      plot.MTS + no.x.axis, 
+      plot.PTS + theme(axis.title.x = element_blank()), 
+      plot.MTS + theme(axis.title.x = element_blank()), 
       plot.FWL,
-      ncol = 1, heights = c(2,2,2.6), common.legend = TRUE , legend="none")
+      ncol = 1, heights = c(2,2,2.3), common.legend = TRUE , legend="none")
   col2<-
     ggarrange(
       plotlist = plot_list2,
-      ncol = 1, heights = c(2,2,2.6), common.legend = TRUE , legend="none")
+      ncol = 1, heights = c(2,2,2.3), common.legend = TRUE , legend="none")
   col3<-
     ggarrange(
       plotlist = plot_list3,
-      ncol = 1, heights = c(2,2,2.6), common.legend = TRUE , legend="none")
+      ncol = 1, heights = c(2,2,2.3), common.legend = TRUE , legend="none")
   
   output <-
     ggarrange(
@@ -862,7 +862,7 @@ plotall_fpost_sim <- function(
       plot_fpost_sim, 
       posts = posts, zoops.f = zoops.f)
   for (i in seq(1,nsources-1)) {
-    plot_list1[[i]] <- plot_list1[[i]] + no.x.axis
+    plot_list1[[i]] <- plot_list1[[i]] + theme(axis.title.x = element_blank())
   }
   
   data.true <- zoops.f[Sources]
@@ -896,7 +896,7 @@ plotall_fpost_sim <- function(
       plot_fpost_TrueMod, 
       data.truemod.long = data.truemod.long)
   for (i in seq(1,nsources-1)) {
-    plot_list2[[i]] <- plot_list2[[i]] + no.x.axis
+    plot_list2[[i]] <- plot_list2[[i]] + theme(axis.title.x = element_blank())
   }
   for (i in seq(1,nsources)) {
     plot_list2[[i]] <- plot_list2[[i]] + theme(axis.title.y = element_blank())
@@ -907,13 +907,13 @@ plotall_fpost_sim <- function(
       plot_fpost_TrueMod_Disc, 
       data.truemod.long = data.truemod.long)
   for (i in seq(1,nsources-1)) {
-    plot_list3[[i]] <- plot_list3[[i]] + no.x.axis
+    plot_list3[[i]] <- plot_list3[[i]] + theme(axis.title.x = element_blank())
   }
   for (i in seq(1,nsources)) {
     plot_list3[[i]] <- plot_list3[[i]] + theme(axis.title.y = element_blank())
   }
   
-  plot_heights <- c(rep(1,nsources-1),1+(0.5-nsources*0.07))
+  plot_heights <- c(rep(1,nsources-1),1+(0.35-nsources*0.07))
   
   nsource <- length(Sources)
   col1<-
