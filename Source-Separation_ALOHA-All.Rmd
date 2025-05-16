@@ -509,7 +509,7 @@ kable(Data.sources, format="pipe")
  
 Now lets visualize the $\dN$ values of each amino acid in each organic matter source.
 
-```{r AA_Plots_Sources, dpi=300, fig.asp=0.4}
+```{r AA_Plots_Sources, dpi=300, fig.height=3, fig.asp=0.4}
 if (include_d13C == TRUE) {
   sources.dC.long <- 
     melt(Data.sources, id.vars=c(variables), measure.vars = intersect(tracers_d13C, tracers),
@@ -1210,7 +1210,7 @@ ggarrange(biplot.SAA,
 
 Making a plot for the paper.
 
-```{r pres-fig, dpi=300, fig.width=5, fig.asp=0.6}
+```{r pres-fig, dpi=300, fig.height=3, fig.asp=0.6}
 
 eigens <- data.frame(PCA.select$var$coord)
 eigens$AA <- row.names(eigens)

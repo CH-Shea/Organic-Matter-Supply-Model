@@ -63,9 +63,7 @@ for (pkg in want) shhh(library(pkg, character.only=TRUE))
 # set some chunk options
 gr <- (1+sqrt(5))/2 # golden ratio, for figures
 opts_chunk$set(comment="  ",
-               fig.asp=0.9/gr,       # <--- gr used here
                fig.align="center",
-               fig.width=5,
                # out.width="95%",
                dpi=96, # set to 300 for important figures
                dev="png", # png, svg, pdf, jpg, tiff
@@ -562,7 +560,7 @@ Sim_Zoop( # use this if treating Phe as a fractionating tracer in the model
 ## Plotting Simulated Data {-}
 
 Let's plot out the tracer values of organic matter sources and zooplankton.
-```{r Tracers_Zoops.plots, dpi=300, fig.asp=0.3, fig.width=8}
+```{r Tracers_Zoops.plots, dpi=300, fig.height=3, fig.width=9}
 
 plot_Source_Consumer_Sim(
   Data.sources,
@@ -695,7 +693,7 @@ plot_sourcepost_sim(posts.long, Data.sources, Tracers)
 
 Now let's generate plots of the MCMC posteriors for the zooplankton sample-specific parameters. We'll want to plot the model posteriors for the tracer values at the base of the food web. We'll do this for all the individual tracers, but also try and visualize the multivariate patterns using LDA. Note that trophic and mixing tracers are plotted on the left, though trophic tracers were not used to fit the mixing model and are not included in LDA on the right.
 
-```{r posterior_base_comparison, dpi=300, fig.asp=0.4, fig.width=8.5}
+```{r posterior_base_comparison, dpi=300, fig.height=3, fig.width=8.5}
 
 plot_basepost_sim(posts, posts.long, Data.sources, Data.zoops, base.sim, Tracers, Variables, LDA.full)
 
@@ -705,7 +703,7 @@ plot_basepost_sim(posts, posts.long, Data.sources, Data.zoops, base.sim, Tracers
 
 We also want to look at the mean_z parameter for each zooplankton sample to see if and where the posteriors for mixing tracers are deviating from the data. If they are, that means either the TDFs are not accurate or there is a missing organic mater source.
 
-```{r posterior_zoop, dpi=300, fig.asp=0.6, fig.width=8.5}
+```{r posterior_zoop, dpi=300, fig.height=4, fig.width=8.5}
 
 plot_zooppost_sim(
   posts.long,  
@@ -721,7 +719,7 @@ plot_zooppost_sim(
 
 We also want to plot comparisons of the trophic parameters used to simulate the zooplankton data and the model posteriors for those parameters. Posterior HDIs (95%, 90%, 75%, and 50%) are shown in blue bars, with posterior modes indicated with text. True values are indicated by yellow lines. Righthand plots show relationships between true and modeled values, with discrepancy plots showing the difference between modeled and true values.
 
-```{r posterior_trophic_comparison, dpi=300, fig.asp=0.5, fig.width=8.5, cache=FALSE}
+```{r posterior_trophic_comparison, dpi=300, fig.height=4.5, fig.width=8.5, cache=FALSE}
 
 plot<-
 plotall_trophicpost_sim(posts, zoops.f)
@@ -747,10 +745,10 @@ plot_Post_Error_Trophic(
 
 Last we'll do the same for mixing coefficients.
 ```{r} 
-aspect = length(Sources)/6
+height = length(Sources)*1.5
 ```
 
-```{r posterior_f_comparisons, eval=TRUE, dpi=300, fig.width=8.5, fig.asp=aspect, cache=FALSE}
+```{r posterior_f_comparisons, eval=TRUE, dpi=300, fig.width=8.5, fig.height=height, cache=FALSE}
 
 plot <- plotall_fpost_sim(posts, zoops.f, Sources)
 plot

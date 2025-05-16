@@ -25,7 +25,7 @@ rm(list=ls())
 
 # fresh start? If FALSE (select 2 in hard bracket), will only rerun a chunk if 
 # changes are detected within the text of that chunk.
-rmCache <- c(TRUE, FALSE)[1]
+rmCache <- c(TRUE, FALSE)[2]
 tfn <- knitr::current_input()              # name of this file
 tfn <- substr(tfn, 1, nchar(tfn)-4)        # Remove the ".Rmd"
 tfn_cache <- paste0("Caches/", tfn, "_cache")         # Append "_cache" to it
@@ -51,10 +51,8 @@ for (pkg in want) shhh(library(pkg, character.only=TRUE))
 # set some chunk options
 gr <- (1+sqrt(5))/2 # golden ratio, for figures
 opts_chunk$set(comment="  ",
-               fig.asp=0.9/gr,       # <--- gr used here
                fig.align="center",
-               fig.width=5,
-               out.width="95%",
+               # out.width="95%",
                dpi=96, # set to 300 for important figures
                dev="png", # png, svg, pdf, jpg, tiff
                #echo=FALSE,
@@ -63,7 +61,7 @@ opts_chunk$set(comment="  ",
                fig.path = paste0(tfn_figures,"/"),
                eval.after="fig.cap", # for dynamic captions
                collapse=TRUE
-               )
+)
 ## defining additional functions we might need
 
 ## a couple of lines we need to run every time we knit
@@ -550,7 +548,7 @@ write.xlsx(DN.compare, "~/University_of_Hawaii/SIA_work/EXPORTS/Data/FWM-results
 
 Now, we'll try and summarize these DN comparisons in a nice figure.
 
-```{r D15N-figure, dpi=300, fig.width=6, fig.asp=0.5}
+```{r D15N-figure, dpi=300, fig.width=6.5, fig.height=3}
 # DN.compare.long$Alpha <- 1
 
 DN.compare.long <- melt(DN.compare[1:3,c("Method",allAA.names)],
