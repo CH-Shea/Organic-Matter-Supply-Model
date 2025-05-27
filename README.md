@@ -3,12 +3,13 @@ The data and model code contained in this repository have not been peer reviewed
 The model description is currently submitted and being considered for publication.
 
 Follow these steps to run the code.
-1. Ensure R Studio is properly installed on your machine.
-2. Download and unzip the file directory in this repository.
-3. Open the R Project file titled "Organic-Matter-Supply-Model.Rproj".
-4. To insure all necessary r packages are installed, navigate to the console and run the following command:
+1. Ensure R Studio is properly installed on your machine. Documentation on how to download and install RStudio can be found here: https://docs.posit.co/ide/user/ide/get-started/
+2. Ensure that JAGS software for running MCMC is properly installed on your machine. Documentation on how to download and install JAGS can be found here: https://mcmc-jags.sourceforge.io/
+3. Download and unzip the file directory in this repository.
+4. Open the R Project file titled "Organic-Matter-Supply-Model.Rproj".
+5. To insure all necessary r packages are installed, navigate to the console and run the following command:
       > source("install_packages.R")
-5. Open and run/knit any of the included .rmd files.
+6. Open and run/knit any of the included .rmd files.
 
 OMSM_ALOHA_sim-zoops....rmd files contain OMSM model runs using simulated zooplankton data based on AA-CSIA data from particles collected at Station ALOHA. These documents rely on many functions stored in the "Functions" and "Utilities" folders.
 - The base version treats Phe as a conservative tracer, though Phe fractionates during zooplankton data simulation.
