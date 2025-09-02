@@ -668,7 +668,7 @@ diagMCMC(rjo_1$mcmc, parName="mean_z[1,9]")
 ```  
 
 # Model Assessment
-Now let's gather up posteriors from the OMSM and plot those relative to the tue values we used to simulate the data to get an idea for how the model is performing.
+Now let's gather up posteriors from the OMSM and plot those relative to the true values we used to simulate the data to get an idea for how the model is performing.
 
 ```{r Posterior_extraction, message=FALSE}
 

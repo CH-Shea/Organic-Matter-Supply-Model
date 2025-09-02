@@ -101,7 +101,7 @@ OMSM_Initlist <- function(
     inits <- list(
       pz = rdirichlet(n = N_Z, rep(1, N_S)),  # Mixing coefficients
       FWL = runif(n = N_Z, 1, 5),             # Food web length
-      MTS = runif(n = N_Z, 0, 5),             # Metazoan trophic steps
+      MTS = runif(n = N_Z, 1, 5),             # Metazoan trophic steps
       .RNG.seed = i + 1,
       .RNG.name = c("base::Super-Duper", "base::Wichmann-Hill", "base::Marsaglia-Multicarry")[i %% 3 + 1]
     )

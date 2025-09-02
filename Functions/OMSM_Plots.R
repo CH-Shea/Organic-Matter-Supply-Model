@@ -10,7 +10,7 @@ plot_sources <- function(
   output <-
     ggplot(Sources.long, aes(x = Tracer, y = Value, color = Source, group=Source))+
     geom_point(alpha=0.4, size = 2, position = position_dodge(width = 0.8))+
-    labs(color="Organic Matter Source", shape="Food Web Base", fill="Zooplankton Samples")+
+    labs(color="Organic Matter Source", shape="Food Web Base", fill="Consumer Samples")+
     theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust=1))
   return(output)
 }
@@ -70,6 +70,54 @@ plot_sources_LDA <- function(
 
 
 
+#### plot_Source_Consumer ####
+## plots tracer values and LDA (if possible) for sources consumers and the food web base
+plot_Source_Consumer <- function(
+    Data.sources,
+    Data.zoops,
+    Tracers, 
+    LDA.full
+) {
+  
+  Sources.long <- melt(Data.sources, id.vars=c(Variables), measure.vars =c(Tracers$MTS, Tracers$FWL, Tracers$mix),
+                       variable.name = "Tracer", value.name = "Value")
+  Zoops.long <- melt(Data.zoops, id.vars = Variables, measure.vars = c(Tracers$MTS, Tracers$FWL, Tracers$mix),
+                     variable.name = "Tracer", value.name = "Value")
+  
+  AA_plots <- ggplot(Sources.long) +
+    geom_point(aes(x = Tracer, y = Value, color = Source, shape = Source), alpha = 0.6,
+               position = position_nudge(x = 0.1)) +
+    geom_point(data = Zoops.long, aes(x = Tracer, y = Value, fill = "Consumer"),
+               color = "black", shape = 17, position = position_nudge(x = -0.1)) +
+    ylab(expression(delta^{15}*N*" (\u2030)")) +
+    labs(color = "Organic Matter Source", shape = "Organic Matter Source", fill = "Consumer Data") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust = 1), axis.title.x = element_blank())+
+    scale_x_discrete(labels = substr(c(Tracers$MTS, Tracers$FWL, Tracers$mix),5,7))
+  
+  if (runMV) {
+    pred.zoops <- predict(LDA.full, Data.zoops)
+    class.zoops <- data.frame(Predicted = pred.zoops$class, pred.zoops$x,
+                              lapply(Data.zoops[Variables], as.character))
+    
+    plot.mix.LD12 <- 
+      ggplot(class.train, aes(x = LD2, y = LD1, color = Source, shape = Source)) +
+      geom_point(alpha = 0.8) +
+      stat_ellipse(type = "t", alpha = 0.6) +
+      geom_point(data = class.zoops, aes(x = LD2, y = LD1, fill = "Consumer"),
+                 color = "black", shape = 17) +
+      theme(legend.position = "none")
+    # Combine tracer and LDA plots.
+    output <- 
+      ggarrange(AA_plots, plot.mix.LD12, ncol = 2, widths = c(2, 1.5),
+                common.legend = TRUE, legend = "right")
+    return(output)
+  } else return(AA_plots)
+}
+
+
+
+
+
 #### plot_Source_Consumer_Sim ####
 ## plots tracer values and LDA (if possible) for sources consumers and the food web base
 plot_Source_Consumer_Sim <- function(
@@ -90,7 +138,7 @@ plot_Source_Consumer_Sim <- function(
   AA_plots <- ggplot(Sources.long) +
     geom_point(aes(x = Tracer, y = Value, color = Source, shape = Source), alpha = 0.6,
                position = position_nudge(x = 0.2)) +
-    geom_point(data = Zoops.long, aes(x = Tracer, y = Value, fill = "Zooplankton"),
+    geom_point(data = Zoops.long, aes(x = Tracer, y = Value, fill = "Consumer"),
                color = "black", shape = 17, position = position_nudge(x = -0.2)) +
     geom_point(data = Base.long, aes(x = Tracer, y = Value, fill = "Food Web Base"),
                color = "brown", shape = 16, position = position_nudge(x = 0)) +
@@ -114,7 +162,7 @@ plot_Source_Consumer_Sim <- function(
       stat_ellipse(type = "t", alpha = 0.6) +
       geom_point(data = class.base, aes(x = LD2, y = LD1, fill = "Food Web Base"),
                  color = "brown", shape = 16) +
-      geom_point(data = class.zoops, aes(x = LD2, y = LD1, fill = "Zooplankton"),
+      geom_point(data = class.zoops, aes(x = LD2, y = LD1, fill = "Consumer"),
                  color = "black", shape = 17) +
       theme(legend.position = "none")
     # Combine tracer and LDA plots.
@@ -128,9 +176,10 @@ plot_Source_Consumer_Sim <- function(
 
 
 
-#### plot_sourcepost_sim ####
+
+#### plot_sourcepost ####
 ## plots the source tracer posteriors relative to the organic matter source data
-plot_sourcepost_sim <- function(
+plot_sourcepost <- function(
     posts.long, 
     Data.sources, 
     Tracers
@@ -147,10 +196,10 @@ plot_sourcepost_sim <- function(
   output <- 
     ggplot()+
     geom_density(data = posts.long$source$samples[
-      which(posts.long$source$samples$Tracer %in% Tracers$mix),],
+      which(posts.long$source$samples$Tracer %in% c(Tracers$mix,Tracers$FWL,Tracers$MTS)),],
       aes(x=Value, fill=Source), alpha=0.8, color="grey10", linewidth=0.5)+
     geom_point(data=Sources.long[
-      which(Sources.long$Tracer %in% Tracers$mix),],
+      which(Sources.long$Tracer %in% c(Tracers$mix,Tracers$FWL,Tracers$MTS)),],
       aes(x=Value, y=0, fill=Source, shape = "Source Data"),
       color="grey10",size=2,stroke=0.75,
       show.legend = FALSE)+
@@ -164,7 +213,97 @@ plot_sourcepost_sim <- function(
           legend.position="bottom")
   return(output)
 }
+plot_sourcepost_sim <-
+  plot_sourcepost
 
+
+
+#### plot_basepost ####
+## generates plots of posteriors for tracer values at the base of the food web in all consumer samples
+plot_basepost <- function(
+    posts, 
+    posts.long, 
+    Data.sources, 
+    Data.zoops,
+    Tracers, 
+    Variables,
+    LDA.full
+) {
+  
+  Sources.long <- melt(Data.sources, id.vars=c(Variables), measure.vars =c(Tracers$MTS, Tracers$FWL, Tracers$mix),
+                       variable.name = "Tracer", value.name = "Value")
+  Zoops.long <- melt(Data.zoops, id.vars = Variables, measure.vars = c(Tracers$MTS, Tracers$FWL, Tracers$mix),
+                     variable.name = "Tracer", value.name = "Value")
+  
+  ## Generating AA δ15N comparison plot
+  posts.long$base$thin$Source <- as.factor(posts.long$base$thin$Source)
+  
+  AAplots <-
+    ggplot(Sources.long)+
+    geom_point(aes(x = Tracer, y = Value, color = Source),
+               position = position_nudge(x = 0.2))+
+    geom_point(data = Zoops.long,
+               aes(x = Tracer, y = Value, fill="Consumer Data"), pch = "triangle",
+               position = position_nudge(x = -0.2))+
+    geom_point(data = posts.long$base$thin[which(posts.long$base$thin$Tracer %in% c(Tracers$MTS, Tracers$FWL, Tracers$mix)),],
+               aes(x = Tracer, y = Value), color = "grey50", alpha=0.1, pch=16,
+               position = position_dodge2(width=0.2))+
+    geom_point(data = posts.long$base$mode[which(posts.long$base$mode$Tracer %in% c(Tracers$MTS, Tracers$FWL, Tracers$mix)),],
+               aes(x = Tracer, y = Value, shape="posterior mode"), color = "brown4", alpha=1,
+               position = position_dodge2(width = 0.2))+
+    # position = position_nudge(x = 0.25))+
+    labs(color="Organic Matter Source", shape="Food Web Base", fill="Consumer Samples")+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust=1))
+  
+  ## Generating LDA comparison plot
+  if(runMV == TRUE){
+    # poject zooplankton into LD space and predict classification
+    pred.base.MCMC = predict(LDA.full, 
+                             posts$base$mode)
+    #class.zoops = data.frame('Class' = pred.zoops$class, pred.zoops$x)
+    # generate data frame which stores predicted classification of particles indexed by size and depth
+    class.base.MCMC = data.frame('Predicted' = pred.base.MCMC$class, pred.base.MCMC$x,
+                                 lapply(posts$base$mode[Variables],as.character))
+    # # Predicted probabilities of class membership
+    # head(pred.base.MCMC$posterior,n=dim(pred.base.MCMC$posterior))
+    # # linear discriminants
+    # head(pred.base.MCMC$x,n=dim(pred.base.MCMC$x))
+    
+    pred.base.sams <- predict(LDA.full,
+                              posts$base$thin[Tracers$mix])
+    # generate data frame which stores predicted classification of particles indexed by size and depth
+    class.base.sams = data.frame('Predicted' = pred.base.sams$class, pred.base.sams$x,
+                                 lapply(posts$base$thin[Variables],as.character))
+    # Predicted probabilities of class membership
+    # head(pred.base.sams$posterior,n=dim(pred.base.sams$posterior))
+    # linear discriminants
+    # head(pred.base.sams$x,n=dim(pred.base.sams$x))
+    
+    plot.mix.LD12 <- 
+      ggplot(data = class.train, 
+             aes(x = LD1, y = LD2), size = 2) + 
+      geom_point(aes(shape=Source, color=Source), alpha = 1) +
+      stat_ellipse(aes(group=Source, color=Source),type = 't', alpha = 0.8)+
+      stat_ellipse(data = class.base.sams,
+                   aes(x = LD1, y = LD2, group=ID),
+                   alpha = 0.5, size=0.4, color="grey20", fill="grey70",
+                   type = 't', geom = "polygon")+
+      geom_point(data = class.base.MCMC,
+                 aes(x = LD1, y = LD2, group=ID),
+                 size=3.5, shape=21, stroke=0.5, color="grey20", fill="brown4")+
+      labs(fill = "Posterior 95% HDI and Mode",
+           color = "Organic Matter Source",
+           shape = "Organic Matter Source"
+      )+
+      guides(color="none")
+    output2 <-
+      ggarrange(AAplots, plot.mix.LD12, ncol = 2, widths = c(2, 1.5),
+                common.legend = TRUE, legend = "left")
+    return(output2)
+  }else {
+    return(AAplots)
+  }
+}
 
 
 
@@ -196,19 +335,19 @@ plot_basepost_sim <- function(
     geom_point(aes(x = Tracer, y = Value, color = Source),
                position = position_nudge(x = 0.2))+
     geom_point(data = Zoops.long,
-               aes(x = Tracer, y = Value, fill="simulated zooplankton"), pch = "triangle",
+               aes(x = Tracer, y = Value, fill="simulated consumer"), pch = "triangle",
                position = position_nudge(x = -0.2))+
     geom_point(data = posts.long$base$thin[which(posts.long$base$thin$Tracer %in% c(Tracers$MTS, Tracers$FWL, Tracers$mix)),],
                aes(x = Tracer, y = Value), color = "grey60", alpha=0.1, pch=16,
                position = position_dodge2(width=0.2))+
-    geom_point(data = posts.long$base$mean[which(posts.long$base$mean$Tracer %in% c(Tracers$MTS, Tracers$FWL, Tracers$mix)),],
-               aes(x = Tracer, y = Value, shape="posterior mean"), color = "brown", alpha=1,
+    geom_point(data = posts.long$base$mode[which(posts.long$base$mode$Tracer %in% c(Tracers$MTS, Tracers$FWL, Tracers$mix)),],
+               aes(x = Tracer, y = Value, shape="posterior mode"), color = "brown4", alpha=1,
                position = position_dodge2(width = 0.2))+
     # position = position_nudge(x = 0.25))+
     geom_point(data = Base.long,
                aes(x = Tracer, y = Value, shape="true value"), color = "red", alpha=1,
                position = position_dodge2(width = 0.2))+
-    labs(color="Organic Matter Source", shape="Food Web Base", fill="Zooplankton Samples")+
+    labs(color="Organic Matter Source", shape="Food Web Base", fill="Consumer Samples")+
     theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust=1))
   
   ## Generating LDA comparison plot
@@ -255,7 +394,7 @@ plot_basepost_sim <- function(
                  aes(x = LD1, y = LD2, fill=Source),
                  size=3.5, shape=21, stroke=1)+
       labs(fill = "Posterior 95% HDI and Mode",
-           color = "Simulated Zooplankton Sample",
+           color = "Simulated Consumer Sample",
            alpha = "True Value",
            shape = "Organic Matter Source"
       )+
@@ -267,6 +406,51 @@ plot_basepost_sim <- function(
   }else {
     return(AAplots)
   }
+}
+
+
+
+
+#### plot_zooppost ####
+## plots posterior zooplankton tracer value posteriors for all samples
+plot_zooppost <- function(
+    posts.long, 
+    Data.zoops, 
+    Data.sources,
+    Tracers
+) {
+  
+  Sources.long <- melt(Data.sources, id.vars=c(Variables), measure.vars =c(Tracers$MTS, Tracers$FWL, Tracers$mix),
+                       variable.name = "Tracer", value.name = "Value")
+  Zoops.long <- melt(Data.zoops, id.vars = Variables, measure.vars = c(Tracers$MTS, Tracers$FWL, Tracers$mix),
+                     variable.name = "Tracer", value.name = "Value")
+  
+  Ymax <- data.frame(
+    PTS = max(posts$trophic$HDI95$PTS),
+    MTS = max(posts$trophic$HDI95$MTS),
+    FWL = max(posts$trophic$HDI95$FWL)
+  )
+  
+  ## Generating AA δ15N comparison plot
+  posts.long$zoop$thin$Source <- as.factor(posts.long$zoop$thin$Source)
+  
+  output <-
+    ggplot(Sources.long)+
+    geom_point(aes(x = Tracer, y = Value, color = Source),
+               position = position_nudge(x = 0.2))+
+    geom_point(data = Zoops.long,
+               aes(x = Tracer, y = Value, fill="measured value"), pch = "triangle",
+               position = position_nudge(x = -0.2))+
+    geom_point(data = posts.long$zoop$thin,
+               aes(x = Tracer, y = Value), color = "grey60", alpha=0.1, pch=16,
+               position = position_dodge2(width=0.1))+
+    geom_point(data = posts.long$zoop$mode[which(posts.long$zoop$mode$Tracer %in% Tracers$mix),],
+               aes(x = Tracer, y = Value, shape="posterior mode"), color = "brown", alpha=1,
+               position = position_dodge2(width = 0.1))+
+    scale_x_discrete(limits = Tracers$mix)+
+    labs(color="Organic Matter Source", shape="Consumer Posterior", fill="Consumer Samples")+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust=1))
+  return(output)
 }
 
 
@@ -303,16 +487,47 @@ plot_zooppost_sim <- function(
     geom_point(aes(x = Tracer, y = Value, color = Source),
                position = position_nudge(x = 0.2))+
     geom_point(data = subset(Zoops.long, Tracer == Tracers$mix),
-               aes(x = Tracer, y = Value, fill="simulated zooplankton"), pch = "triangle",
+               aes(x = Tracer, y = Value, fill="simulated consumer"), pch = "triangle",
                position = position_nudge(x = -0.2))+
     geom_point(data = posts.long$zoop$thin[which(posts.long$zoop$thin$Tracer %in% Tracers$mix),],
                aes(x = Tracer, y = Value), color = "grey60", alpha=0.1, pch=16,
                position = position_dodge2(width=0.1))+
-    geom_point(data = posts.long$zoop$mean[which(posts.long$zoop$mean$Tracer %in% Tracers$mix),],
-               aes(x = Tracer, y = Value, shape="posterior mean"), color = "brown", alpha=1,
+    geom_point(data = posts.long$zoop$mode[which(posts.long$zoop$mode$Tracer %in% Tracers$mix),],
+               aes(x = Tracer, y = Value, shape="posterior mode"), color = "brown", alpha=1,
                position = position_dodge2(width = 0.1))+
-    labs(color="Organic Matter Source", shape="Zooplankton Posterior", fill="Zooplankton Samples")+
+    labs(color="Organic Matter Source", shape="Consumer Posterior", fill="Consumer Samples")+
     theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust=1))
+  return(output)
+}
+
+
+
+
+#### plot_trophicpost ####
+## plots the trophic paramter posteriors for all consumer samples
+plot_trophicpost <- function(
+    posts.long
+){
+  
+  theme_set(theme_classic2()+
+              theme(panel.grid.major.x = element_line(colour = "grey95"),
+                    panel.grid.major.y = element_line(colour = "grey95")))
+  
+  ## plotting posterior δ15N values for organic matter sources compared to data
+  output <- 
+    ggplot()+
+    geom_density(data = posts.long$trophic$samples,
+      aes(x=Value, fill=Param), alpha=0.8, color="grey10", linewidth=0.5)+
+    geom_point(data=posts.long$trophic$mode,
+      aes(x=Value, y=0, fill=Param),
+      color="grey10",size=2,stroke=0.75, shape=24)+
+    xlab("Value")+
+    facet_wrap(~ID, scales = "free")+
+    scale_x_continuous(n.breaks=4)+
+    labs(fill="Trophic Parameter")+
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+          axis.title.y = element_blank(),plot.title = element_text(hjust = 0.5),
+          legend.position="bottom")
   return(output)
 }
 
@@ -359,7 +574,7 @@ plot_FWLpost_sim <- function(
       lty=1,size=0.5,alpha=1)+
     scale_color_manual(values=c("goldenrod"))+
     labs(fill="Model Posterior", color="True Value",lty="95% HDI")+
-    xlab("Simulated Zooplankton Sample") + ylab("FWL")+
+    xlab("Simulated Consumer Sample") + ylab("FWL")+
     scale_x_continuous(breaks = seq(1,nzoops,2))+
     scale_y_continuous(breaks = c(-1.0,-0.5, 0.0, 0.5 , 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0), 
                        labels = c(-1.0, "" , 0.0,  "" , 1.0, "" , 2.0, "" , 3.0, "" , 4.0, "" , 5.0))+
@@ -410,7 +625,7 @@ plot_PTSpost_sim <- function(
       lty=1,size=0.5,alpha=1)+
     scale_color_manual(values=c("goldenrod"))+
     labs(fill="Model Posterior", color="True Value",lty="95% HDI")+
-    xlab("Simulated Zooplankton Sample") + ylab("PTS")+
+    xlab("Simulated Consumer Sample") + ylab("PTS")+
     scale_x_continuous(breaks = seq(1,nzoops,2))+
     scale_y_continuous(breaks = c(-1.0,-0.5, 0.0, 0.5 , 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0), 
                        labels = c(-1.0, "" , 0.0,  "" , 1.0, "" , 2.0, "" , 3.0, "" , 4.0, "" , 5.0))+
@@ -461,7 +676,7 @@ plot_MTSpost_sim <- function(
       lty=1,size=0.5,alpha=1)+
     scale_color_manual(values=c("goldenrod"))+
     labs(fill="Model Posterior", color="True Value",lty="95% HDI")+
-    xlab("Simulated Zooplankton Sample") + ylab("MTS")+
+    xlab("Simulated Consumer Sample") + ylab("MTS")+
     scale_x_continuous(breaks = seq(1,nzoops,2))+
     scale_y_continuous(breaks = c(-1.0,-0.5, 0.0, 0.5 , 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0), 
                        labels = c(-1.0, "" , 0.0,  "" , 1.0, "" , 2.0, "" , 3.0, "" , 4.0, "" , 5.0))+
@@ -726,6 +941,37 @@ plot_Post_Error_Trophic <- function(
 
 
 
+#### plot_fpost ####
+## plots the mixing coefficient posteriors for all consumer samples
+plot_fpost <- function(
+    posts.long
+){
+  
+  theme_set(theme_classic2()+
+              theme(panel.grid.major.x = element_line(colour = "grey95"),
+                    panel.grid.major.y = element_line(colour = "grey95")))
+  
+  ## plotting posterior δ15N values for organic matter sources compared to data
+  output <- 
+    ggplot()+
+    geom_density(data = posts.long$f$samples,
+                 aes(x=Value, fill=Param), alpha=0.8, color="grey10", linewidth=0.5)+
+    geom_point(data=posts.long$f$mode,
+               aes(x=Value, y=0, fill=Param),
+               color="grey10",size=2,stroke=0.75, shape=24)+
+    xlab("Value")+
+    facet_wrap(~ID, scales = "free")+
+    scale_x_continuous(n.breaks=4)+
+    labs(fill="Mixing Parameter")+
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+          axis.title.y = element_blank(),plot.title = element_text(hjust = 0.5),
+          legend.position="bottom")
+  return(output)
+}
+
+
+
+
 #### plot_fpost_sim ####
 ## Generates a single plot comparing mixing coefficient posteriors with true values for simiulated data
 plot_fpost_sim = function(
@@ -774,11 +1020,43 @@ plot_fpost_sim = function(
       lty=1,size=0.5,alpha=1)+
     scale_color_manual(values=c("goldenrod"))+
     labs(fill="Model Posterior", color="True Value", lty="95% HDI")+
-    xlab("Simulated Zooplankton Sample") + ylab(paste0("f(",variable,")")) +
+    xlab("Simulated Consumer Sample") + ylab(paste0("f(",variable,")")) +
     scale_y_continuous(breaks = c(0,0.25,0.5,0.75,1), labels = c("0","","0.5","","1.0"))+
     scale_x_continuous(breaks = seq(1,nzoops,2))+
     coord_cartesian(ylim = c(0,1), xlim = c(0,nzoops+1), expand = FALSE)
   return(output)
+}
+
+
+
+
+#### plot_fpost_ternary ####
+## Generates a ternary plot showing mixing parameter posteriors for all samples
+plot_fpost_ternary <- function(
+    posts,
+    Sources
+){
+  ## Making ternary plots of mixing parameters
+  ggtern(data = posts$f$samples,
+         aes_string(x=Sources[1],
+                    y=Sources[2],
+                    z=Sources[3]))+
+    stat_confidence_tern(aes(fill=model), color="grey20", alpha=0.4, size=0,
+                         breaks=c(0.95,0.90,0.75,0.50), geom = "polygon")+
+    scale_fill_manual(values=c("steelblue1","steelblue4"))+
+    geom_point(data = posts$f$mode,
+               aes_string(x=Sources[1],
+                          y=Sources[2],
+                          z=Sources[3]),
+               size = 3, shape = 24, fill="steelblue1")+
+    theme_bw()+
+    theme(legend.position = "none",
+          tern.axis.title.T=element_blank(),
+          tern.axis.title.L=element_blank(),
+          tern.axis.title.R=element_blank())+
+    theme_arrowlarge()+
+    scale_shape_manual(values = c(24))+
+    facet_wrap(~ ID,nrow = 4)
 }
 
 

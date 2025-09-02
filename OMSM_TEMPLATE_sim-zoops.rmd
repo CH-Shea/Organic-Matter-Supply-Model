@@ -41,42 +41,29 @@ if (rmCache) {
 # load packages quietly
 shhh <- suppressPackageStartupMessages # It's a library, so shhh!
 want <- c(
-  "knitr",
-  "readxl",          # For reading Excel files
-  "MASS",            # Statistical functions (e.g., LDA)
-  "vegan",           # Ecology statistics
-  "FactoMineR",      # PCA and utilities
-  "factoextra",      # Extra tools for FactoMineR
-  "runjags",         # Bayesian MCMC with JAGS
-  "TruncatedDistributions", # Truncated probability distributions
-  "coda",            # MCMC diagnostics
-  "DT",              # Sortable tables
-  "openxlsx",        # Excel writing
-  "compositions",    # Compositional data analysis
-  "kableExtra",      # Enhanced tables
-  "zeallot",         # Multiple assignment
-  "magrittr",        # Pipe operator
-  "DirichletReg",    # Dirichlet regression
-  "Ternary",         # Ternary plots
-  "png",             # PNG support
-  "ggplot2",         # Plotting
-  "ggpubr",          # Publication-ready plots
-  "ggstance",        # Vertical dodging
-  "ggtern",          # Ternary plots in ggplot2
-  "ggforce",         # Extra plotting features
-  "plotly",          # Interactive plots
-  "gridExtra",       # Grid layouts
-  "graphics",        # Base graphics
-  "reshape2"         # Data reshaping
+  "knitr",           # For R Markdown document knitting
+  "readxl",          # For reading Excel data files
+  "MASS",            # For linear discriminant analysis
+  "FactoMineR",      # For principal component analysis
+  "factoextra",      # For PCA visualization
+  "runjags",         # For Bayesian MCMC with JAGS
+  "coda",            # For MCMC diagnostics
+  "DT",              # For interactive data tables
+  "ggplot2",         # For creating plots
+  "ggpubr",          # For publication-ready plots
+  "gridExtra",       # For arranging multiple plots
+  "reshape2",        # For data reshaping
+  "magrittr",        # For pipe operator
+  "compositions",    # For compositional data analysis
+  "DirichletReg",    # For Dirichlet regression
+  "Ternary"          # For creating ternary plots
 )
 for (pkg in want) shhh(library(pkg, character.only=TRUE))
 
 # set some chunk options
 gr <- (1+sqrt(5))/2 # golden ratio, for figures
 opts_chunk$set(comment="  ",
-               fig.asp=0.9/gr,       # <--- gr used here
                fig.align="center",
-               fig.width=5,
                # out.width="95%",
                dpi=96, # set to 300 for important figures
                dev="png", # png, svg, pdf, jpg, tiff
@@ -164,7 +151,7 @@ This notebook is composed of the following sections:
 
 # Setup
 
-In the first few chunks, the user should enter all of the basic information that the model code will need to proceed with analysis. Lines of code requiring user attention will be indicated with `#!!!!#`.
+In the first few chunks, the user should enter all of the basic information that the model code will need to proceed with analysis. Lines of code requiring user attention will be indicated with `#### USER ATTENTION REQUIRED ####`.
 
 ## Importing Data {-}
 First let's import the data. If you have not already, navigate to Data>OMSM_Data_Template.xlsx. Enter your data into this excel spreadsheet and then continue to the "Import_Data" chunk.
@@ -174,6 +161,7 @@ If not using the template spreadsheet, ensure that your data file has the follow
 - Rows for samples and columns for variables/tracers
 - One column identifying if each sample is a "source" or "consumer"
 - One column identifying which source group that sample belongs to
+- One column containing a unique identifier for each sample
 - Columns for descriptive variables (optional)
 - Columns containing tracer values
 - Columns containing uncertainty in tracer values (must be >0)
@@ -183,20 +171,22 @@ If not using the template spreadsheet, ensure that your data file has the follow
 ## All data should be stored in one, single .xlsx file.
 ## See OMSM_Data_Template.xlsx in Data folder for guidance on data formatting
 
-################################################################################
 ## IMPORTING DATA ##
+########################## USER ATTENTION REQUIRED #############################
 # Define the location of .xlsx file, and sheet name if multiple sheets are  present.
 Data.all <-
   read_excel(
-    "Data/OMSM_Data_Template.xlsx", #!!!!# ensure this path matches the location of your data
+    "Data/OMSM_Data_Template.xlsx", # ensure this path matches the location of your data
     sheet = "Data")
-
+################################################################################
 ```
 
 We will export model results to a .Rdata file in the Data folder following analysis. Indicate the desired file name in the following chunk.
 
 ```{r export_filename}
-export.file.name <- "OMSM_TEMPLATE_sim-zoops.Rdata"
+########################## USER ATTENTION REQUIRED #############################
+export.file.name <- "OMSM_TEMPLATE_sim-zoops.Rdata" #  indicate the name of the file you would like to export model results to (must end in .Rdata)
+################################################################################
 ```
 
 ## Identifying Tracers {-}
@@ -402,7 +392,7 @@ The next thing we will do is process the data. We will automatically remove any 
 
 We can also programmatically define source groups based on quantitative criteria or identify samples we would like to exclude .
 
-```{r Proccess_Data, eval=TRUE, fig.asp=0.6, out.width="100%"}
+```{r Process_Data, eval=TRUE, fig.asp=0.6, out.width="100%"}
 
 #### Retaining only columns for variables defined in the above chunk ####
 Data.all <- Data.all[c(Variables,Tracers$all,SDTracers$all)]
@@ -429,7 +419,7 @@ if(FALSE){
 
 # Defining the preferred Order in which to reference organic matter sources
 Data.all$Source <- factor(Data.all$Source, levels = c(Sources,"Consumer"))
-
+################################################################################
 # To define the order that specific descriptive variables should be referenced, adapt the below example.
 # Data.all["Size"] <- factor(Data.all[["Size"]], levels = c(
 #   c("0.3-1 μm", "1-5 μm", "1-6 μm", "6-51 μm", ">51 μm", "Sediment Trap",

@@ -26,24 +26,7 @@ OMSM_Extract_Posts <- function(
   ## 1. Global model parameter posteriors (TDFs, d15N(sources)) ##
   # we'll make a list which contains samples and summary data for each set of posteriors
   posts.global <- list(
-    TDF_meta = list(
-      samples = data.frame(matrix(nrow = nsams,ncol=0)),
-      HDI95 = data.frame(matrix(nrow = 2,ncol=0)),
-      HDI90 = data.frame(matrix(nrow = 2,ncol=0)),
-      HDI75 = data.frame(matrix(nrow = 2,ncol=0)),
-      HDI50 = data.frame(matrix(nrow = 2,ncol=0)),
-      mean = data.frame(matrix(nrow = 1,ncol=0)),
-      mode = data.frame(matrix(nrow = 1,ncol=0))
-    ),
-    TDF_proto = list(
-      samples = data.frame(matrix(nrow = nsams,ncol=0)),
-      HDI95 = data.frame(matrix(nrow = 2,ncol=0)),
-      HDI90 = data.frame(matrix(nrow = 2,ncol=0)),
-      HDI75 = data.frame(matrix(nrow = 2,ncol=0)),
-      HDI50 = data.frame(matrix(nrow = 2,ncol=0)),
-      mean = data.frame(matrix(nrow = 1,ncol=0)),
-      mode = data.frame(matrix(nrow = 1,ncol=0))
-    ),
+    data.frame(matrix(nrow = 2,ncol=0)),
     source = list(
       samples = data.frame(matrix(nrow = nsams*nsources,ncol=0)),
       HDI95 = data.frame(matrix(nrow = 2*nsources,ncol=0)),
@@ -55,47 +38,6 @@ OMSM_Extract_Posts <- function(
     )
   )
   
-  # grabbing TDF posteriors
-  for (i in which(Tracers$all %in% Tracers$frac)) {
-    # samples of TDF_meta
-    posts.global$TDF_meta$samples[,Tracers$all[i]] <- 
-      sams[,paste("TDF_meta[",i,"]",sep = "")]
-    # HDI min and max of TDF_meta
-    posts.global$TDF_meta$HDI95[,Tracers$all[i]] <- 
-      HDIofMCMC(sams[,paste("TDF_meta[",i,"]",sep = "")], credMass=0.95)
-    posts.global$TDF_meta$HDI90[,Tracers$all[i]] <- 
-      HDIofMCMC(sams[,paste("TDF_meta[",i,"]",sep = "")], credMass=0.90)
-    posts.global$TDF_meta$HDI75[,Tracers$all[i]] <- 
-      HDIofMCMC(sams[,paste("TDF_meta[",i,"]",sep = "")], credMass=0.75)
-    posts.global$TDF_meta$HDI50[,Tracers$all[i]] <- 
-      HDIofMCMC(sams[,paste("TDF_meta[",i,"]",sep = "")], credMass=0.50)
-    # mean of TDF_meta
-    posts.global$TDF_meta$mean[,Tracers$all[i]] <- 
-      mean(sams[,paste("TDF_meta[",i,"]",sep = "")])
-    # mean of TDF_meta
-    posts.global$TDF_meta$mode[,Tracers$all[i]] <- 
-      post.mode(sams[,paste("TDF_meta[",i,"]",sep = "")])
-  }
-  for (i in which(Tracers$all %in% Tracers$varTDF)) {
-    # samples of TDF proto
-    posts.global$TDF_proto$samples[Tracers$all[i]] <- 
-      sams[,paste("TDF_proto[",i,"]",sep = "")]
-    # HDI min and max of TDF_proto
-    posts.global$TDF_proto$HDI95[Tracers$all[i]] <- 
-      HDIofMCMC(sams[,paste("TDF_proto[",i,"]",sep = "")], credMass = 0.95)
-    posts.global$TDF_proto$HDI90[Tracers$all[i]] <- 
-      HDIofMCMC(sams[,paste("TDF_proto[",i,"]",sep = "")], credMass = 0.90)
-    posts.global$TDF_proto$HDI75[Tracers$all[i]] <- 
-      HDIofMCMC(sams[,paste("TDF_proto[",i,"]",sep = "")], credMass = 0.75)
-    posts.global$TDF_proto$HDI50[Tracers$all[i]] <- 
-      HDIofMCMC(sams[,paste("TDF_proto[",i,"]",sep = "")], credMass = 0.50)
-    # mean of TDF_proto
-    posts.global$TDF_proto$mean[Tracers$all[i]] <- 
-      mean(sams[,paste("TDF_proto[",i,"]",sep = "")])
-    # mean of TDF_proto
-    posts.global$TDF_proto$mode[Tracers$all[i]] <- 
-      post.mode(sams[,paste("TDF_proto[",i,"]",sep = "")])
-  }
   # grabbing d15N(source) posteriors
   source_alpha <- c("A","B","C","D","E","F")
   temp1<-temp2<-temp3<-c()
@@ -139,24 +81,6 @@ OMSM_Extract_Posts <- function(
   
   # at times we'll want this data in long format so we'll handle that here as well
   posts.global.long <- list(
-    TDF_meta = list(
-      samples = melt(posts.global$TDF_meta$samples, value.name = "Value", variable.name = "Tracer"),
-      HDI95 = melt(posts.global$TDF_meta$HDI95, value.name = "Value", variable.name = "Tracer"),
-      HDI90 = melt(posts.global$TDF_meta$HDI90, value.name = "Value", variable.name = "Tracer"),
-      HDI75 = melt(posts.global$TDF_meta$HDI75, value.name = "Value", variable.name = "Tracer"),
-      HDI50 = melt(posts.global$TDF_meta$HDI50, value.name = "Value", variable.name = "Tracer"),
-      mean = melt(posts.global$TDF_meta$mean, value.name = "Value", variable.name = "Tracer"),
-      mode = melt(posts.global$TDF_meta$mode, value.name = "Value", variable.name = "Tracer")
-    ),
-    TDF_proto = list(
-      samples = melt(posts.global$TDF_proto$samples, value.name = "Value", variable.name = "Tracer"),
-      HDI95 = melt(posts.global$TDF_proto$HDI95, value.name = "Value", variable.name = "Tracer"),
-      HDI90 = melt(posts.global$TDF_proto$HDI90, value.name = "Value", variable.name = "Tracer"),
-      HDI75 = melt(posts.global$TDF_proto$HDI75, value.name = "Value", variable.name = "Tracer"),
-      HDI50 = melt(posts.global$TDF_proto$HDI50, value.name = "Value", variable.name = "Tracer"),
-      mean = melt(posts.global$TDF_proto$mean, value.name = "Value", variable.name = "Tracer"),
-      mode = melt(posts.global$TDF_proto$mode, value.name = "Value", variable.name = "Tracer")
-    ),
     source = list(
       samples = melt(posts.global$source$samples, 
                      id.vars = "Source", value.name = "Value", variable.name = "Tracer"),
@@ -358,21 +282,21 @@ OMSM_Extract_Posts <- function(
   posts.zoops.long <- list(
     f = list(
       samples = melt(posts.zoops$f$samples, 
-                     id.vars = Variables, value.name = "f", variable.name = "Source"),
+                     id.vars = Variables, value.name = "Value", variable.name = "Param"),
       thin = melt(posts.zoops$f$thin, 
-                  id.vars = Variables, value.name = "f", variable.name = "Source"),
+                  id.vars = Variables, value.name = "Value", variable.name = "Param"),
       HDI95 = melt(posts.zoops$f$HDI95, 
-                   id.vars = Variables, value.name = "f", variable.name = "Source"),
+                   id.vars = Variables, value.name = "Value", variable.name = "Param"),
       HDI90 = melt(posts.zoops$f$HDI90, 
-                   id.vars = Variables, value.name = "f", variable.name = "Source"),
+                   id.vars = Variables, value.name = "Value", variable.name = "Param"),
       HDI75 = melt(posts.zoops$f$HDI75, 
-                   id.vars = Variables, value.name = "f", variable.name = "Source"),
+                   id.vars = Variables, value.name = "Value", variable.name = "Param"),
       HDI50 = melt(posts.zoops$f$HDI50, 
-                   id.vars = Variables, value.name = "f", variable.name = "Source"),
+                   id.vars = Variables, value.name = "Value", variable.name = "Param"),
       mean = melt(posts.zoops$f$mean, 
-                  id.vars = Variables, value.name = "f", variable.name = "Source"),
+                  id.vars = Variables, value.name = "Value", variable.name = "Param"),
       mode = melt(posts.zoops$f$mode, 
-                  id.vars = Variables, value.name = "f", variable.name = "Source")
+                  id.vars = Variables, value.name = "Value", variable.name = "Param")
     ),
     trophic = list(
       samples = melt(posts.zoops$trophic$samples, 

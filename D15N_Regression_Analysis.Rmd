@@ -598,6 +598,89 @@ ggplot(data = DN.compare.long,
 
 ```
 
+We'll also generate a multi-panel plot of $\dN$ for Phe, Lys, Ser, and Gly vs TP(Ala-Phe)-1.
+
+```{r SAA_Reg_Figure, dpi=300, fig.width=8, fig.height=2.5, eval=TRUE}
+LM.dNPhe = lm(d15NPhe ~ (TPAla-1)+Location, data = data.reg)
+
+plot.Phe <- 
+  ggplot(data = data.reg, aes(x = (TPAla-1), y = d15NPhe))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, 
+              aes(y = predict(LM.dNPhe, data.reg), color = "Regression"))+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Phe]*" (\u2030)"))+
+  geom_abline(
+    aes(slope = DN.comp$Phe, intercept = 0, lty = ""),
+    color = "black")+
+  theme_light()+
+  labs(lty = "Literature TDF")+
+  scale_color_discrete(labels = c("5 N","8 N","ALOHA S","ALOHA W","Station Papa","Linear Regression"))+
+  ylim(-6,10)
+
+LM.dNLys = lm(d15NLys ~ (TPAla-1)+Location, data = data.reg.phenorm)
+
+plot.Lys <- 
+  ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NLys))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, 
+              aes(y = predict(LM.dNLys, data.reg.phenorm), color="Regression"))+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Lys-Phe]*" (\u2030)"))+
+  geom_abline(
+    aes(slope = DN.comp$Lys-DN.comp$Phe, intercept = 0, lty = ""),
+    color = "black")+
+  theme_light()+
+  labs(lty = "Literature TDF")+
+  scale_color_discrete(labels = c("5 N","8 N","ALOHA S","ALOHA W","Station Papa","Linear Regression"))+
+  ylim(-6,10)
+
+LM.dNSer = lm(d15NSer ~ (TPAla-1)+Location, data = data.reg.phenorm)
+
+plot.Ser <- 
+  ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NSer))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, 
+              aes(y = predict(LM.dNSer, data.reg.phenorm), color="Regression"))+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Ser-Phe]*" (\u2030)"))+
+  geom_abline(
+    aes(slope = DN.comp$Ser-DN.comp$Phe, intercept = 0, lty = ""),
+    color = "black")+
+  theme_light()+
+  labs(lty = "Literature TDF")+
+  scale_color_discrete(labels = c("5 N","8 N","ALOHA S","ALOHA W","Station Papa","Linear Regression"))+
+  ylim(-6,10)
+
+LM.dNGly = lm(d15NGly ~ (TPAla-1)+Location, data = data.reg.phenorm)
+
+plot.Gly <- 
+  ggplot(data = data.reg.phenorm, aes(x = (TPAla-1), y = d15NGly))+
+  geom_point(aes(color=Location))+
+  geom_smooth(method=lm, 
+              aes(y = predict(LM.dNGly, data.reg.phenorm), color="Regression"))+
+  xlab(expression(TP[Ala-Phe]-1))+
+  ylab(expression(delta^{15}*N[Gly-Phe]*" (\u2030)"))+
+  geom_abline(
+    aes(slope = DN.comp$Gly-DN.comp$Phe, intercept = 0, lty = ""),
+    color = "black")+
+  theme_light()+
+  labs(lty = "Literature TDF")+
+  scale_color_discrete(labels = c("5 N","8 N","ALOHA S","ALOHA W","Station Papa","Linear Regression"))+
+  ylim(-6,10)
+
+ggarrange(
+  plot.Phe,
+  plot.Lys,
+  plot.Gly,
+  plot.Ser,
+  nrow = 1,
+  common.legend = TRUE,
+  legend = "bottom"
+)
+
+```
+
 # Plots and Statistics {-}
 
 We're also going to generate plots visualizing regressions for each amino acid against TP. We will prot regressings against TP(Ala-Phe) and TP(Glx-Phe).
