@@ -1,6 +1,4 @@
-This repository contains all r code for a stable isotope mixing model termed the Organic Matter Supply Model.
-The data and model code contained in this repository have not been peer reviewed and should be considered "in development."
-The model description is currently submitted and being considered for publication.
+This repository contains all r code for a stable isotope mixing model termed the Organic Matter Supply Model. A full description of the model has been published at _PeerJ_ and can be found here: https://doi.org/10.7717/peerj.20220 
 
 Follow these steps to run the code.
 1. Ensure R Studio is properly installed on your machine. Documentation on how to download and install RStudio can be found here: https://docs.posit.co/ide/user/ide/get-started/
